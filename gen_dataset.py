@@ -3,8 +3,10 @@
 import os
 import yaml
 from tifresi.utils import load_signal
-from transforms import wave_to_stft, spec_to_mel
+from transforms import spec_to_preprocessed_spec, spec_to_mel
 from datasets import Dataset
+import global_objects
+from utils import max_norm
 
 # debug on a small subset of the dataset
 debug = True
@@ -35,11 +37,11 @@ def data_generator():
                         # skip last piece of split if it is shorter than x_len
                         continue
                     # generate the entries of the tuple
-                    spec = wave_to_stft(piece)
-                    # TODO: is it log-ed twice ??
-                    log_mel_spec = spec_to_mel(spec)
+                    unprocessed_spec = global_objects.stft_system.spectrogram(piece)
+                    preprocesed_spec = spec_to_preprocessed_spec(unprocessed_spec, numpy=True)
+                    log_mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
                     # yield the tuple
-                    yield {"spec": spec, "log_mel_spec": log_mel_spec}
+                    yield {"preprocesed_spec": preprocesed_spec, "log_mel_spec": log_mel_spec}
 
 if __name__ == "__main__":
     ds = Dataset.from_generator(data_generator)

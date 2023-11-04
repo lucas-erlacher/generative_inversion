@@ -10,8 +10,9 @@ sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in libr
 spec_x_len: 1048576 # = 2^20, number of samples of each spectrogram (that we save)
 stft_num_channels: 1024
 stft_hop_size: 256 
-stft_min_val: -50 # minimum allowed value of the spectrogram (in dB)
+stft_min_val: -50 # = minimum allowed value of the spectrogram (in dB)
 # ACHTUNG: The following has to hold in order to have reconstructability: stft_channels / hop_size >= 4
 
 # MEL TRANSFORMATION
 mel_num_channels: 80
+log_mel_min_val: -50 # = minimum allowed value of the log mel spectrogram (in dB)

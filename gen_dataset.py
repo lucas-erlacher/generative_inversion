@@ -6,7 +6,6 @@ from tifresi.utils import load_signal
 from transforms import spec_to_preprocessed_spec, spec_to_mel
 from datasets import Dataset
 import global_objects
-from utils import max_norm
 
 # debug on a small subset of the dataset
 debug = True

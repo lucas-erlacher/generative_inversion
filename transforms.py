@@ -3,11 +3,9 @@
 # By default the inputs and outputs of the functions are expected to be torch tensors (since these functions will be used as part of a DL model/pipeline). 
 # Alternatively the numpy flag can be set to true (is false by default) which will make the function accept and return numpy arrays.
 
-# TODO: do the checks in the main function return a satisfying result?
-
 import yaml
 import numpy as np
-from utils import db_transform, to_01, db_inverse, print_range
+from utils import db_transform, to_01, db_inverse, spec_to_wav, print_range
 import global_objects
 import torch
 
@@ -16,7 +14,7 @@ config = yaml.safe_load(open("config.yaml", "r"))
 
 
 
-########  WAVE TO STFT  ########
+########  UNPROCESSED SPEC TO PREPROCESSED SPEC  ########
 
 # PURPOSE:
 # - generate the target element of a training data pair
@@ -34,16 +32,16 @@ def spec_to_preprocessed_spec(spec, numpy=False):
     # 2) 
     # db transform
     # RANGE: [-infty, 0]
-    db_normed_spec = db_transform(normed_spec)   
+    db_normed_spec = db_transform(normed_spec)
     # 3)
     # clip very negative values
     # RANGE: [stft_min_val, 0]
     db_normed_spec[db_normed_spec < config["stft_min_val"]] = config["stft_min_val"]
-    clipped_db_normed_spec = db_normed_spec    
+    clipped_db_normed_spec = db_normed_spec   
     # 4) 
     # transform to [0, 1] (which might be easier for the NN to learn)
     # RANGE: [0, 1]
-    normed_clipped_db_normed_spec = to_01(clipped_db_normed_spec)    
+    normed_clipped_db_normed_spec = to_01(clipped_db_normed_spec) 
     # convert back to tensor if necessary
     if not numpy:
         normed_clipped_db_normed_spec = torch.from_numpy(normed_clipped_db_normed_spec)
@@ -62,11 +60,13 @@ def spec_to_preprocessed_spec_inverse(spec, numpy=False):
     if np.min(spec) < 0 or np.max(spec) > 1:
         raise Exception("spec_to_preprocessed_spec_inverse: spec must be in [0,1]")
     # 4)
-    # transform from [0, 1] back to [stft_min_val, 0] can't be done 
+    # transform from [0, 1] back to [stft_min_val, 0] can't be undone:
+    # - we can't undo the division by max_val bc we don't know what it was
+    # - we can't undo the shifting by min_val bc we don't know what it was
     # RANGE: [0,1]
     clipped_db_normed_spec = spec
     # 3)
-    # clipping can't be undone
+    # clipping can't be undone since we don't know which (if any) values got clipped
     # RANGE: [0,1]
     db_normed_spec = clipped_db_normed_spec
     # 2)
@@ -74,23 +74,18 @@ def spec_to_preprocessed_spec_inverse(spec, numpy=False):
     # RANGE: [1, 1.2589]
     normed_spec = db_inverse(db_normed_spec)
     # 1)
-    # normalization can again not be undone
+    # normalization can again not be undone for the same reasons as in spec_to_preprocessed_spec_inverse/4
     # RANGE: [1, 1.2589]
     spec = normed_spec
-    # turn spec into array representing waveform
-    wave_array = global_objects.stft_system.invert_spectrogram(spec)
     # convert back to tensor if necessary
     if not numpy:
-        wave_array = torch.from_numpy(wave_array)
-    return wave_array
+        spec = torch.from_numpy(spec)
+    return spec
 
 
 
 
-########  SPECTROGRAM TO MEL  ########
-
-# TODO: 
-# - check all ranges of forward and backward transforms
+########  UNPROCESSED SPEC TO MEL SPEC  ########
 
 # PURPOSE:
 # - generate the input element of a training data pair
@@ -103,27 +98,31 @@ def spec_to_mel(spec, numpy=False):
     # convert to numpy array if we are taking in a torch tensor
     if not numpy:
         spec = spec.numpy()
+    # 0) even though it is not part of the definition in the Tagebuch we need to normalize to [0,1] because otherwise subsequent values that were determined 
+    #    via tweaking (e.g. log_mel_min_val) will not work for all inputs 
+    normed_spec = to_01(spec)
     # 1) 
     # multiply by mel basis
-    # RANGE: [0,1] (determined from examining some ranges so not 100% guaranteed)
-    mel_spec = np.dot(global_objects.mel_basis, spec) 
+    # RANGE: [0,1] 
+    # - both bounds determined from examining some ranges so not 100% guaranteed
+    mel_normed_spec = np.dot(global_objects.mel_basis, normed_spec) 
     # 2) 
-    # db transform (I think that this is the "log" operation that everybody is referring to when they say "log mel spectrogram")
-    # RANGE: [-infty,0] (uncertainty inherited from mel_spec)
-    db_mel_spec = db_transform(mel_spec)    
+    # db transform (I think this is the "log" operation that everybody is referring to when they say "log mel spectrogram")
+    # RANGE: [-infty,0]
+    db_mel_normed_spec = db_transform(mel_normed_spec) 
     # 3) 
     # clip very negative values
     # RANGE: [log_mel_min_val, 0] (uncertainty inherited from db_mel_spec)
-    db_mel_spec[db_mel_spec < config["log_mel_min_val"]] = config["log_mel_min_val"]
-    clipped_db_mel_spec = db_mel_spec    
+    db_mel_normed_spec[db_mel_normed_spec < config["log_mel_min_val"]] = config["log_mel_min_val"]
+    clipped_db_mel_normed_spec = db_mel_normed_spec   
     # 4) 
     # transform to [0,1] because the output of this method is supposed to be the input to a NN and being in [0,1] might make the NN's life easier)
-    # RANGE: [0,1] (uncertainty inherited from clipped_db_mel_spec)
-    normed_clipped_db_mel_spec = to_01(clipped_db_mel_spec) 
+    # RANGE: [0,1] 
+    normed_clipped_db_mel_normed_spec = to_01(clipped_db_mel_normed_spec) 
     # convert back to tensor if necessary
     if not numpy:
-        normed_clipped_db_mel_spec = torch.from_numpy(normed_clipped_db_mel_spec)
-    return normed_clipped_db_mel_spec
+        normed_clipped_db_mel_normed_spec = torch.from_numpy(normed_clipped_db_mel_normed_spec)
+    return normed_clipped_db_mel_normed_spec
 
 # PURPOSE:
 # - sanity check the implementation of spec_to_mel
@@ -135,27 +134,32 @@ def spec_to_mel(spec, numpy=False):
 def spec_to_mel_inverse(spec, numpy=False):
     # convert to numpy array if we are taking in a torch tensor
     if not numpy:
-        log_mel_spec = log_mel_spec.numpy()
+        spec = spec.numpy()
     # assert that spec is in [0,1]
     if np.min(spec) < 0 or np.max(spec) > 1:
         raise Exception("spec_to_mel_inverse: spec must be in [0,1]")
     # 4)
-    # transform from [0, 1] back to [log_mel_min_val, 0] can't be done
+    # undoing the normalization can't be done for the same resons as in spec_to_preprocessed_spec_inverse/4
     # RANGE: [0,1]
-    clipped_db_mel_spec = spec
+    clipped_db_mel_normed_spec = spec
     # 3)
     # clipping can't be undone
     # RANGE: [0,1]
-    db_mel_spec = clipped_db_mel_spec
+    db_mel_normed_spec = clipped_db_mel_normed_spec
     # 2)
     # db transform can be undone
     # RANGE: [1, 1.2589]
-    mel_spec = db_inverse(db_mel_spec)
+    mel_normed_spec = db_inverse(db_mel_normed_spec)
     # 1)
     # multiply by mel basis can be undone (using the pseudoinverse)
-    # RANGE: [0, ???] (determined from examining some ranges so not 100% guaranteed)
-    spec = np.dot(np.linalg.pinv(global_objects.mel_basis), mel_spec)
+    # RANGE: [0,infty]
+    # - both bounds determined from examining some ranges so not 100% guaranteed
+    normed_spec = np.dot(np.linalg.pinv(global_objects.mel_basis), mel_normed_spec)
+    # 0)
+    # undoing the normalization can't be done for the same resons as in spec_to_preprocessed_spec_inverse/4
     # convert back to tensor if necessary
+    # RANGE: [0,infty]
+    spec = normed_spec
     if not numpy:
         spec = torch.from_numpy(spec)
     return spec
@@ -165,25 +169,35 @@ def spec_to_mel_inverse(spec, numpy=False):
 
 ########  TEST  ########
 
+# TODO: maybe I do need to norm in spec_to_mel method to make the tweaked params e.g. clipping limimt work always
+
 # main function tests if the implementations of the transforms are "good" by running the
 # transforms forward and backward and comparing the result of that against the original input
 if __name__ == "__main__":
     import librosa
     from tifresi.utils import load_signal
 
-    # TODO: I dont think the steps in this test method respect the newly added assumptions that the transforms make about their inputs
-    '''
+    # save input as wav for reference
     filename = librosa.util.example('brahms')
     y, _ = load_signal(filename)
     y = y[:int(config["spec_x_len"] / 2)]  # less than spec_x_len because the brahms sample is not long enough
-    array_to_wav(y, "x_input.wav")
-    # test wave to stft
-    spec = spec_to_preprocessed_spec(y)
-    recon = spec_to_preprocessed_spec_inverse(spec)
-    array_to_wav(recon, "x_recon_1.wav")
-    # test spec to mel
-    mel_spec = spec_to_mel(spec)
-    recon = spec_to_mel_inverse(mel_spec)
-    wave = global_objects.stft_system.invert_spectrogram(spec)
-    array_to_wav(wave, "x_recon_2.wav")
-    '''
+    unprocessed_spec = global_objects.stft_system.spectrogram(y)
+    spec_to_wav(unprocessed_spec, "x_input.wav")
+    
+    # test spec_to_preprocessed_spec
+    spec = spec_to_preprocessed_spec(unprocessed_spec, numpy=True)
+    spec_to_wav(spec, "x_intermediate_1.wav")
+    recon = spec_to_preprocessed_spec_inverse(spec, numpy=True)
+    spec_to_wav(recon, "x_recon_1.wav")
+
+    # test spec_to_mel
+    mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
+    recon = spec_to_mel_inverse(mel_spec, numpy=True)
+    spec_to_wav(recon, "x_recon_2.wav")
+
+    # baseline comparison to see how much information loss the mel basis transform itself causes
+    mel = np.dot(global_objects.mel_basis, unprocessed_spec)
+    print_range(mel)
+    recon = np.dot(np.linalg.pinv(global_objects.mel_basis), mel)
+    recon[recon < 0] = 0    # there are some slightly negative values in recon (maybe some from of imprecision?) 
+    spec_to_wav(recon, "x_recon_3.wav")

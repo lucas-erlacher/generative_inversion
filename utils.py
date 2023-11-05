@@ -23,7 +23,7 @@ def to_01(array):
     min_val = np.min(array)
     if min_val < 0:
         array += abs(min_val)
-    # normalize to [0,1]
+    # now that we only have positive vals, normalize to [0,1]
     return max_norm(array)
 
 ########  STATS  ########
@@ -48,7 +48,8 @@ def plot_spec(spec, title):
 
 ########  TO WAV  ########
 
-# useful for fining out which spec in a chain of specs is the first to go south
+# ONLY APPLICABLE TO "NORMAL" SPECTROGRAMS (AND E.G. NOT MEL SPECTROGRAMS)!
+# useful for finding out which spec in a chain of specs is the first to go south
 def spec_to_wav(spec, title):
     wave = global_objects.stft_system.invert_spectrogram(spec)
     write(title, config["sampling_rate"], wave)

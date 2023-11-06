@@ -45,3 +45,8 @@ def data_generator():
 if __name__ == "__main__":
     ds = Dataset.from_generator(data_generator)
     ds.save_to_disk("dataset")
+
+# TODO: what is the best way of storing the dataset? 
+# as wave files and then do computaion on the fly? 
+# or store the computed specs? which is faster (time it) when loading the 
+# data via the dataloader?

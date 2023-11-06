@@ -3,6 +3,8 @@
 # By default the inputs and outputs of the functions are expected to be torch tensors (since these functions will be used as part of a DL model/pipeline). 
 # Alternatively the numpy flag can be set to true (is false by default) which will make the function accept and return numpy arrays.
 
+# TODO: (later) all methods need to work on tensors (cant backprop through nparray)
+
 import yaml
 import numpy as np
 from utils import db_transform, to_01, db_inverse, spec_to_wav, print_range
@@ -28,7 +30,13 @@ def spec_to_preprocessed_spec(spec, numpy=False):
     # 1) 
     # normalize spec between 0 and 1
     # RANGE: [0, 1]
-    normed_spec = to_01(spec)    
+    normed_spec = to_01(spec)   
+
+    # TODO: 
+    # - bump zeros to eps (eps is based on stft_min_val (see tifrei transforms for that))
+    # - to_01 needs to be based on stft_min_val and not on array_min val
+    #   - implementation was something like x/stft_min_val + 1 
+
     # 2) 
     # db transform
     # RANGE: [-infty, 0]
@@ -101,10 +109,16 @@ def spec_to_mel(spec, numpy=False):
     # 0) even though it is not part of the definition in the Tagebuch we need to normalize to [0,1] because otherwise subsequent values that were determined 
     #    via tweaking (e.g. log_mel_min_val) will not work for all inputs 
     normed_spec = to_01(spec)
+
+    # TODO: bump 0s to eps
+
     # 1) 
     # multiply by mel basis
     # RANGE: [0,1] 
     # - both bounds determined from examining some ranges so not 100% guaranteed
+
+    # TODO: determine tighter upper bound by looking at ranges and update all ranges
+
     mel_normed_spec = np.dot(global_objects.mel_basis, normed_spec) 
     # 2) 
     # db transform (I think this is the "log" operation that everybody is referring to when they say "log mel spectrogram")
@@ -119,6 +133,9 @@ def spec_to_mel(spec, numpy=False):
     # transform to [0,1] because the output of this method is supposed to be the input to a NN and being in [0,1] might make the NN's life easier)
     # RANGE: [0,1] 
     normed_clipped_db_mel_normed_spec = to_01(clipped_db_mel_normed_spec) 
+    
+    # TODO: dont do to_01 but linearly scale last range into [0,1]
+
     # convert back to tensor if necessary
     if not numpy:
         normed_clipped_db_mel_normed_spec = torch.from_numpy(normed_clipped_db_mel_normed_spec)
@@ -168,8 +185,6 @@ def spec_to_mel_inverse(spec, numpy=False):
 
 
 ########  TEST  ########
-
-# TODO: maybe I do need to norm in spec_to_mel method to make the tweaked params e.g. clipping limimt work always
 
 # main function tests if the implementations of the transforms are "good" by running the
 # transforms forward and backward and comparing the result of that against the original input

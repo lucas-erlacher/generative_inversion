@@ -186,7 +186,6 @@ if __name__ == "__main__":
     
     # test spec_to_preprocessed_spec
     spec = spec_to_preprocessed_spec(unprocessed_spec, numpy=True)
-    spec_to_wav(spec, "x_intermediate_1.wav")
     recon = spec_to_preprocessed_spec_inverse(spec, numpy=True)
     spec_to_wav(recon, "x_recon_1.wav")
 
@@ -194,10 +193,3 @@ if __name__ == "__main__":
     mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
     recon = spec_to_mel_inverse(mel_spec, numpy=True)
     spec_to_wav(recon, "x_recon_2.wav")
-
-    # baseline comparison to see how much information loss the mel basis transform itself causes
-    mel = np.dot(global_objects.mel_basis, unprocessed_spec)
-    print_range(mel)
-    recon = np.dot(np.linalg.pinv(global_objects.mel_basis), mel)
-    recon[recon < 0] = 0    # there are some slightly negative values in recon (maybe some from of imprecision?) 
-    spec_to_wav(recon, "x_recon_3.wav")

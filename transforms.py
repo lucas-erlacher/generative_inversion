@@ -1,24 +1,12 @@
 # Implementations of transformations that are used in multiples places in the project and therefore have to be consistent across each other. 
 
+# TODO (later): all methods need to work on tensors (cant backprop through nparray) and change the following comment:
 # By default the inputs and outputs of the functions are expected to be torch tensors (since these functions will be used as part of a DL model/pipeline). 
 # Alternatively the numpy flag can be set to true (is false by default) which will make the function accept and return numpy arrays.
-
-# ON THE SHIFTING BACK INTO THE NEGATIVE RANGE IN THE INVERSE METHODS:
-# has to be done otherwise the reconstruction will be heavily distorted. 
-# since we don't know min_val from the to_01 invocation we have to use a proxy for the magnitude of the back-shift. 
-# in principle many values could be used here but we might as well make it make as much sense as possible in our ctxt. 
-# we can't reconstruct the lower bound of the input array in from the forward pass bc maybe nothing got clipped in the forward pass and then shifting by 
-# the clipping threshold will not reconstruct the lower bound. 
-# we can however reconstruct the upper bound of the input array from the forward pass because this value is definitely known. 
-# therefore we will choose proxy_min_val such that the upper bound of the input array from the forward pass is reconstructed.
-# note that this includes scaling by the maximum of the input to the inverse method since this spec might not peak at 1 meaning that 
-# if we don't scale by the max we might undershoot the upper bound of the input array (which we aimed to match exactly) which would make the recon low in volume.
-# in the above sentences we by "input array" mean the array that goes into the "shift into the positive range" step" from the forward passes of the transforms.
 
 # ATTENTION: in the ranges that you write in the comments do not use the values from the config file but only the names of the config file values.
 #            that way changes to the config file values will not break the ranges in the comments.
 
-# TODO (later): all methods need to work on tensors (cant backprop through nparray)
 
 import yaml
 import numpy as np
@@ -55,11 +43,11 @@ def spec_to_preprocessed_spec(normed_spec, numpy=False):
     db_normed_spec[db_normed_spec < config["stft_min_val"]] = config["stft_min_val"]
     clipped_db_normed_spec = db_normed_spec   
     # 2.5)
-    # shift into the positive range (so that we can use to_01)
-    # RANGE: [0, abs(min_val)]
-    min_val = np.min(clipped_db_normed_spec)
-    if min_val < 0:
-        clipped_db_normed_spec += abs(min_val)
+    # shift into the positive range (so that we can use to_01). 
+    # note that shifting by abs(stft_min_val) might not be optimal since if no vals got clipped we are shifting by too much 
+    # (but I can't think of a better shift factor that wouldn't introduce an analogous problem of shifting too much/not shifting enough).
+    # RANGE: [0, abs(stft_min_val)]
+    clipped_db_normed_spec += abs(config["stft_min_val"])
     # 3) 
     # transform to [0, 1] (which might be easier for the NN to learn)
     # RANGE: [0, 1]
@@ -80,21 +68,19 @@ def spec_to_preprocessed_spec_inverse(spec, numpy=False):
         spec = spec.numpy()
     # assert that spec is in [0,1]
     if np.min(spec) < 0 or np.max(spec) > 1:
-        raise Exception("spec_to_preprocessed_spec_inverse: spec must be in [0,1]")
-    # save this bc spec is unfortunately scaled by undo_to_01 but we need it in 3.5
-    max = np.max(spec)  
+        raise Exception("spec_to_preprocessed_spec_inverse: spec must be in [0,1]") 
     # 3)
-    # to_01 normalization can partially be undone
+    # to_01 normalization can be undone
     # RANGE: [0, stft_dyn_range_upper_bound]
     clipped_db_normed_spec = undo_to_01(spec, config["stft_dyn_range_upper_bound"])
     # 2.5)
-    # shift back into the negative range (otherwise recon will be heavily distorted). 
-    # RANGE: [-stft_dyn_range_upper_bound, 0]
-    pseudo_min_val = -config["stft_dyn_range_upper_bound"] * max
-    clipped_db_normed_spec = clipped_db_normed_spec + pseudo_min_val
+    # invert 2.5 (otherwise recon will be heavily distorted). 
+    # RANGE: [stft_min_val, 0]
+    # upper bound being 0 assumes stft_dyn_range_upper_bound = abs(stft_min_val) (which is currently the case in the config file)
+    clipped_db_normed_spec -= abs(config["stft_min_val"])
     # 2)
     # clipping can't be undone since we don't know which (if any) values got clipped
-    # RANGE: RANGE: [-stft_dyn_range_upper_bound, 0]
+    # RANGE: RANGE: [stft_min_val, 0]
     db_normed_spec = clipped_db_normed_spec
     # 1)
     # db transform can be undone
@@ -142,10 +128,10 @@ def spec_to_mel(normed_spec, numpy=False, debug=False):
     if debug: print_range(clipped_db_mel_normed_spec)
     # 3.5)
     # shift into the positive range (so that we can use to_01)
-    # RANGE: [0, -14 + abs(min_val)]
-    min_val = np.min(clipped_db_mel_normed_spec)
-    if min_val < 0:
-        clipped_db_mel_normed_spec += abs(min_val)
+    # note that shifting by abs(log_mel_min_val) might not be optimal since if no vals got clipped we are shifting by too much
+    # (but I can't think of a better shift factor that wouldn't introduce an analogous problem of shifting too much/not shifting enough).
+    # RANGE: [0, abs(log_mel_min_val) - 14]
+    clipped_db_mel_normed_spec += abs(config["log_mel_min_val"])
     if debug: print_range(clipped_db_mel_normed_spec)
     # 4) 
     # transform to [0,1] because the output of this method is supposed to be the input to a NN and being in [0,1] might make the NN's life easier)
@@ -174,31 +160,29 @@ def spec_to_mel_inverse(spec, numpy=False, debug=False):
     # assert that spec is in [0,1]
     if np.min(spec) < 0 or np.max(spec) > 1:
         raise Exception("spec_to_mel_inverse: spec must be in [0,1]")
-    # save this bc spec is unfortunately scaled by undo_to_01 but we need it in 3.5
-    max = np.max(spec)  
     # 4)
-    # to_01 normalization can partially be undone
+    # to_01 normalization can be undone
     # RANGE: [0, log_mel_dyn_range_upper_bound]
     clipped_db_mel_normed_spec = undo_to_01(spec, config["log_mel_dyn_range_upper_bound"])
     if debug: print_range(clipped_db_mel_normed_spec)
     # 3.5)
-    # shift back into the negative range (otherwise recon will be heavily distorted).
-    # RANGE: [proxy_min_val, -14] 
-    proxy_min_val = (-config["log_mel_dyn_range_upper_bound"] * max -14.668440077126899) 
-    clipped_db_mel_normed_spec = clipped_db_mel_normed_spec + proxy_min_val
+    # invert 3.5 (otherwise recon will be heavily distorted).
+    # RANGE: [log_mel_min_val, 0]
+    # upper bound being 0 assumes log_mel_dyn_range_upper_bound = abs(log_mel_min_val) (which is currently the case in the config file) 
+    clipped_db_mel_normed_spec -= abs(config["log_mel_min_val"])
     if debug: print_range(clipped_db_mel_normed_spec)
     # 3)
     # clipping can't be undone
-    # RANGE: [proxy_min_val, -14] 
+    # RANGE: [log_mel_min_val, 0] 
     db_mel_normed_spec = clipped_db_mel_normed_spec
     if debug: print_range(db_mel_normed_spec)
     # 2)
     # db transform can be undone
-    # RANGE: [db_inverse(proxy_min_val), 0.04]
+    # RANGE: [db_inverse(log_mel_min_val), 1]
     mel_normed_spec = db_inverse(db_mel_normed_spec)
     if debug: print_range(mel_normed_spec)
     # 1)
-    # multiply by mel basis can be undone (using the pseudoinverse)
+    # undoing multiplication with mel basis can be approximated (using the pseudoinverse)
     # RANGE: [0, 1]
     # - both bounds determined from examining some ranges so not 100% guaranteed
     normed_spec = np.dot(np.linalg.pinv(global_objects.mel_basis), mel_normed_spec)
@@ -209,21 +193,12 @@ def spec_to_mel_inverse(spec, numpy=False, debug=False):
     if not numpy:
         normed_spec = torch.from_numpy(normed_spec)
 
-    # ATTENTION: I have noticed that normed_spec can exceed [0, 1]. 
-    # - going over 1:
-    #   the problem is here the imprecision of the upper bound in 1) in the forward pass. 
-    #   this imprecision propagates through the forward method and therefore the upper bound of 3 is not exactly -14 either (it in reality is a bit lower).
-    #   in 3.5 of the backwards pass we do however match the upper bound exactly to the (not perfectly precise) upper bound of the ouptut
-    #   of 3 from the forward pass (= -14). this matching pull some values up too high which results in them exceeding 1 after the pinv_mel transform. 
-    #   this problem could be improved by measuring a tighter upper bound in 1) but as long as I can't precisely prove the uper bound of the 
-    #   mel_basis transform this problem will persist. 
-    # - going below 0:
-    #   the problem here is that we cannot reconstruct the clipped values resulting in some values in the low end of the range are too high which 
-    #   by db transform are being mapped to smth that is too high (compared to what it was in the forward pass) which by the inverse mel pinv transform 
-    #   are being mapped to a value that is < 0. I don't think I can do anything about this since there is a loss of information happening here. 
+    # ATTENTION: I have noticed that normed_spec can slightly go beneath 0.
+    # the problem here is that we cannot reconstruct the clipped values resulting in some values in the low end of the range are too high which 
+    # by db transform are being mapped to smth that is too high (compared to what it was in the forward pass) which by the inverse mel pinv transform 
+    # are being mapped to a value that is < 0. I don't think I can do anything about this since this is a loss of information that leads to these deviations.
     # 
-    # not sure this is a good solution but at least the "listen to the reconstruction" test sounds good (even with this):
-    normed_spec[normed_spec > 1] = 1  
+    # not sure this is a good solution but at least the "listen to the reconstruction" test goes well with this:
     normed_spec[normed_spec < 0] = 0
 
     return normed_spec

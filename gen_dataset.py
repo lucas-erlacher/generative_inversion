@@ -38,7 +38,7 @@ def data_generator():
                     # generate the entries of the tuple
                     unprocessed_spec = normed_spec(piece)
                     preprocesed_spec = spec_to_preprocessed_spec(unprocessed_spec, numpy=True)
-                    log_mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
+                    log_mel_spec = spec_to_mel(unprocessed_spec, numpy=True, debug=False)
                     # yield the tuple
                     yield {"preprocesed_spec": preprocesed_spec, "log_mel_spec": log_mel_spec}
 

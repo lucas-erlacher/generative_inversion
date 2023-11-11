@@ -8,7 +8,5 @@ class SimpleModel(torch.nn.Module):
 
     def forward(self, x):
 
-        return spec_to_preprocessed_spec(spec_to_mel_inverse(x))
-
-    # TODO: have a spec transform method that does to_01 internally and only returns 
-    # normd specs and then rm all the initial norms 
+        mel_inv = spec_to_mel_inverse(x)
+        return spec_to_preprocessed_spec(mel_inv)

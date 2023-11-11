@@ -77,7 +77,7 @@ def spec_to_preprocessed_spec(normed_spec, numpy=False):
 def spec_to_preprocessed_spec_inverse(spec, numpy=False):
     # convert to numpy array if we are taking in a torch tensor
     if not numpy:
-        audio = audio.numpy()
+        spec = spec.numpy()
     # assert that spec is in [0,1]
     if np.min(spec) < 0 or np.max(spec) > 1:
         raise Exception("spec_to_preprocessed_spec_inverse: spec must be in [0,1]")
@@ -115,10 +115,12 @@ def spec_to_preprocessed_spec_inverse(spec, numpy=False):
 # 
 # ASSUMPTIONS ON INPUT:
 # spec is assumed to be a fresh spectrogram that is normed to [0,1]
-def spec_to_mel(normed_spec, numpy=False):
+def spec_to_mel(normed_spec, numpy=False, debug=False):
+    if debug: print_range(normed_spec)
     # convert to numpy array if we are taking in a torch tensor
     if not numpy:
-        spec = spec.numpy()
+        normed_spec = normed_spec.numpy()
+    # assert that spec is in [0,1]
     if np.min(normed_spec) < 0 or np.max(normed_spec) > 1:
         raise Exception("spec_to_mel: spec must be in [0,1]")
     # 1) 
@@ -126,25 +128,32 @@ def spec_to_mel(normed_spec, numpy=False):
     # RANGE: [0, 0.04] 
     # - both bounds determined from examining some ranges so not 100% guaranteed (this uncertainty is propagated through the rest of the method)
     mel_normed_spec = np.dot(global_objects.mel_basis, normed_spec)
+    if debug: print_range(mel_normed_spec)
     # 2) 
     # db transform (I think this is the "log" operation that everybody is referring to when they say "log mel spectrogram")
-    # RANGE: [-infty, -14] 
+    # RANGE: [-infty, -14]
     db_mel_normed_spec = db_transform(mel_normed_spec) 
+    if debug: print_range(db_mel_normed_spec)
     # 3) 
     # clip very negative values
     # RANGE: [log_mel_min_val, -14]
     db_mel_normed_spec[db_mel_normed_spec < config["log_mel_min_val"]] = config["log_mel_min_val"]
     clipped_db_mel_normed_spec = db_mel_normed_spec   
+    if debug: print_range(clipped_db_mel_normed_spec)
     # 3.5)
     # shift into the positive range (so that we can use to_01)
     # RANGE: [0, -14 + abs(min_val)]
     min_val = np.min(clipped_db_mel_normed_spec)
     if min_val < 0:
         clipped_db_mel_normed_spec += abs(min_val)
+    if debug: print_range(clipped_db_mel_normed_spec)
     # 4) 
     # transform to [0,1] because the output of this method is supposed to be the input to a NN and being in [0,1] might make the NN's life easier)
     # RANGE: [0, 1] 
     normed_clipped_db_mel_normed_spec = to_01(clipped_db_mel_normed_spec, config["log_mel_dyn_range_upper_bound"])
+    if debug: 
+        print_range(normed_clipped_db_mel_normed_spec)
+        print()
     # convert back to tensor if necessary
     if not numpy:
         normed_clipped_db_mel_normed_spec = torch.from_numpy(normed_clipped_db_mel_normed_spec)
@@ -157,8 +166,8 @@ def spec_to_mel(normed_spec, numpy=False):
 #
 # ASSUMPTIONS ON INPUT:
 # well, it has to come from spec_to_mel but the only thing we can really check/assert about it is that it is in [0,1]
-def spec_to_mel_inverse(spec, numpy=False):
-    print()
+def spec_to_mel_inverse(spec, numpy=False, debug=False):
+    if debug: print_range(spec)
     # convert to numpy array if we are taking in a torch tensor
     if not numpy:
         spec = spec.numpy()
@@ -171,30 +180,52 @@ def spec_to_mel_inverse(spec, numpy=False):
     # to_01 normalization can partially be undone
     # RANGE: [0, log_mel_dyn_range_upper_bound]
     clipped_db_mel_normed_spec = undo_to_01(spec, config["log_mel_dyn_range_upper_bound"])
+    if debug: print_range(clipped_db_mel_normed_spec)
     # 3.5)
     # shift back into the negative range (otherwise recon will be heavily distorted).
-    # RANGE: [proxy_min_val, -14]
-    proxy_min_val = (-config["log_mel_dyn_range_upper_bound"] * max - 14) 
+    # RANGE: [proxy_min_val, -14] 
+    proxy_min_val = (-config["log_mel_dyn_range_upper_bound"] * max -14.668440077126899) 
     clipped_db_mel_normed_spec = clipped_db_mel_normed_spec + proxy_min_val
+    if debug: print_range(clipped_db_mel_normed_spec)
     # 3)
     # clipping can't be undone
-    # RANGE: [proxy_min_val, -14]
+    # RANGE: [proxy_min_val, -14] 
     db_mel_normed_spec = clipped_db_mel_normed_spec
+    if debug: print_range(db_mel_normed_spec)
     # 2)
     # db transform can be undone
     # RANGE: [db_inverse(proxy_min_val), 0.04]
     mel_normed_spec = db_inverse(db_mel_normed_spec)
+    if debug: print_range(mel_normed_spec)
     # 1)
     # multiply by mel basis can be undone (using the pseudoinverse)
     # RANGE: [0, 1]
     # - both bounds determined from examining some ranges so not 100% guaranteed
     normed_spec = np.dot(np.linalg.pinv(global_objects.mel_basis), mel_normed_spec)
+    if debug: 
+        print_range(normed_spec)
+        print()
     # convert back to tensor if necessary
     if not numpy:
         normed_spec = torch.from_numpy(normed_spec)
 
-    # ATTENTION: I have noticef that normed_spec can slightly exceed the [0,1] range in both directions of the range. 
-    # I believe that this is due to the fact that the pinv is not an exact inverse so it can also introduce error at the boundaries of the range. 
+    # ATTENTION: I have noticed that normed_spec can exceed [0, 1]. 
+    # - going over 1:
+    #   the problem is here the imprecision of the upper bound in 1) in the forward pass. 
+    #   this imprecision propagates through the forward method and therefore the upper bound of 3 is not exactly -14 either (it in reality is a bit lower).
+    #   in 3.5 of the backwards pass we do however match the upper bound exactly to the (not perfectly precise) upper bound of the ouptut
+    #   of 3 from the forward pass (= -14). this matching pull some values up too high which results in them exceeding 1 after the pinv_mel transform. 
+    #   this problem could be improved by measuring a tighter upper bound in 1) but as long as I can't precisely prove the uper bound of the 
+    #   mel_basis transform this problem will persist. 
+    # - going below 0:
+    #   the problem here is that we cannot reconstruct the clipped values resulting in some values in the low end of the range are too high which 
+    #   by db transform are being mapped to smth that is too high (compared to what it was in the forward pass) which by the inverse mel pinv transform 
+    #   are being mapped to a value that is < 0. I don't think I can do anything about this since there is a loss of information happening here. 
+    # 
+    # not sure this is a good solution but at least the "listen to the reconstruction" test sounds good (even with this):
+    normed_spec[normed_spec > 1] = 1  
+    normed_spec[normed_spec < 0] = 0
+
     return normed_spec
 
 
@@ -221,8 +252,6 @@ if __name__ == "__main__":
     spec_to_wav(recon, "x_recon_1.wav")
 
     # test spec_to_mel
-    mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
-    recon = spec_to_mel_inverse(mel_spec, numpy=True)
-    # recon can now have some slightly negative values which have to be clipped to 0 in order to be able to invert the spec to a waveform. 
-    recon[recon < 0] = 0
+    mel_spec = spec_to_mel(unprocessed_spec, numpy=True, debug=True)
+    recon = spec_to_mel_inverse(mel_spec, numpy=True, debug=True)
     spec_to_wav(recon, "x_recon_2.wav")

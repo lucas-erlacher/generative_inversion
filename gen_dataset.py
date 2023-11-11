@@ -5,12 +5,12 @@ import yaml
 from tifresi.utils import load_signal
 from transforms import spec_to_preprocessed_spec, spec_to_mel
 from datasets import Dataset
-import global_objects
+from utils import normed_spec
 
 # debug on a small subset of the dataset
 debug = True
 debug_limit_folders = 1
-debug_limit_files = 3
+debug_limit_files = 10
 
 def data_generator():
     config = yaml.safe_load(open("config.yaml", "r"))
@@ -36,7 +36,7 @@ def data_generator():
                         # skip last piece of split if it is shorter than x_len
                         continue
                     # generate the entries of the tuple
-                    unprocessed_spec = global_objects.stft_system.spectrogram(piece)
+                    unprocessed_spec = normed_spec(piece)
                     preprocesed_spec = spec_to_preprocessed_spec(unprocessed_spec, numpy=True)
                     log_mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
                     # yield the tuple

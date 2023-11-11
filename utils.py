@@ -8,23 +8,26 @@ config = yaml.safe_load(open("config.yaml", "r"))
 
 ########  NORMALIZATION  ########
 
-# array is assumed to be positive valued.
-# function returns an array in [0,1]. 
-def max_norm(array):
-    max_val = np.max(array)
-    # edge case:
-    if max_val == 0:
-        return array  # if max_val is 0 then don't divid but just return the spec (since it is already in [0,1] if all values are 0)
-    return array / max_val
+# turns the range of any array into [0,1] 
+# assumes that the array only contains positive values
+def to_01(array, dyn_range_upper_bound):  
+    if np.min(array) < 0:
+        raise Exception("to_01: array must only contain positive values")  
+    # we had prevoiusly divided by the max value but that makes no sense since then every spec would
+    # peak towards 1 and so relative loudness between different spectrograms would have been discarded
+    array /= dyn_range_upper_bound
+    return array
 
-# turns the range of any array into [0,1] i.e. no assumptions on the range of the input 
-def to_01(array):
-    # shift all values to be positive (only needed if the array contains negative values)
-    min_val = np.min(array)
-    if min_val < 0:
-        array += abs(min_val)
-    # now that we only have positive vals, normalize to [0,1]
-    return max_norm(array)
+def undo_to_01(array, dyn_range_upper_bound):
+    array *= dyn_range_upper_bound
+    return array
+
+def normed_spec(wave):
+    spec = global_objects.stft_system.spectrogram(wave)
+    # normalize to [0,1] (only if necessary)
+    if np.max(spec) > 1:
+        spec = to_01(spec, config["stft_dyn_range_upper_bound"])
+    return spec
 
 ########  STATS  ########
 
@@ -58,6 +61,9 @@ def spec_to_wav(spec, title):
 
 # array could be any numpy array so it can be a spectrogram or a waveform
 def db_transform(array):
+    # handle zero values
+    eps = 1e-10
+    array[array == 0] = eps
     return 10 * np.log10(array)
 
 def db_inverse(array):

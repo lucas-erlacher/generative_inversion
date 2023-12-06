@@ -3,6 +3,9 @@ from scipy.io.wavfile import write
 import yaml
 import global_objects
 import numpy as np
+import torch
+from tinytag import TinyTag
+import librosa
 
 config = yaml.safe_load(open("config.yaml", "r"))
 
@@ -31,7 +34,10 @@ def normed_spec(wave):
 
 ########  STATS  ########
 
+# input can be either a numpy array or a torch tensor
 def print_range(array):
+    if (type(array) == torch.Tensor):
+        array = array.detach().cpu().numpy()
     print("range: " + str(np.min(array)) + " " + str(np.max(array)))
 
 def print_stats(array):
@@ -55,7 +61,7 @@ def plot_spec(spec, title):
 # useful for finding out which spec in a chain of specs is the first to go south
 def spec_to_wav(spec, title):
     wave = global_objects.stft_system.invert_spectrogram(spec)
-    write(title, config["sampling_rate"], wave)
+    write(title, config['sampling_rate'], wave)
 
 ########  OTHER  ########
 
@@ -68,3 +74,8 @@ def db_transform(array):
 
 def db_inverse(array):
     return 10 ** (array / 10)
+
+def load(path):
+    data = TinyTag.get(path)
+    y, _ = librosa.load(path)
+    return y

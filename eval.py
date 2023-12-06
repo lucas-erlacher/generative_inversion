@@ -1,6 +1,6 @@
 # evaluate models 
 
-from simple_model import SimpleModel
+from models.simple_model import SimpleModel
 from loader import Loader
 from sklearn.metrics import mean_squared_error
 

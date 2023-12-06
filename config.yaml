@@ -1,11 +1,4 @@
 ---
-
-# This file stores the values of parameters of my project. I am putting these values in a 
-# separate file so that I can import a onsistent set parameters into all the files that need them.  
-
-
-
-
 # GERERAL
 sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in librosa.load) use by default
 
@@ -13,8 +6,8 @@ sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in libr
 
 
 # STFT
-spec_x_len: 1048576 # = 2^20, number of samples of each spectrogram (that we save)
-stft_num_channels: 1024
+spec_x_len: 65536 # 1048576 = 2^20, number of samples of each spectrogram (that we save)
+stft_num_channels: 256
 stft_hop_size: 256 
 # ACHTUNG: 
 # the following has to hold in order to have reconstructability: stft_num_channels / hop_size >= 4

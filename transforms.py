@@ -1,16 +1,18 @@
 # Implementations of transformations that are used in multiples places in the project and therefore have to be consistent across each other. 
 
-# TODO (later): all methods need to work on tensors (cant backprop through nparray) and change the following comment:
+# ATTENTION: 
+# in the ranges that you write in the comments do not use the values from the config file but only the names of the config file values.
+# that way changes to the config file values will not break the ranges in the comments.
+
+# TODO (later): all methods need to work on tensors (cant backprop through nparray) and I think the following comment has to be changed:
+# The functions internally operate on numpy arrays since that is what the linear algebra operations require. 
 # By default the inputs and outputs of the functions are expected to be torch tensors (since these functions will be used as part of a DL model/pipeline). 
 # Alternatively the numpy flag can be set to true (is false by default) which will make the function accept and return numpy arrays.
-
-# ATTENTION: in the ranges that you write in the comments do not use the values from the config file but only the names of the config file values.
-#            that way changes to the config file values will not break the ranges in the comments.
 
 
 import yaml
 import numpy as np
-from utils import db_transform, to_01, db_inverse, spec_to_wav, normed_spec, print_range, undo_to_01
+from utils import db_transform, to_01, db_inverse, spec_to_wav, normed_spec, print_range, undo_to_01, load
 import global_objects
 import torch
 
@@ -41,11 +43,12 @@ def spec_to_preprocessed_spec(normed_spec, numpy=False):
     # clip very negative values
     # RANGE: [stft_min_val, 0]
     db_normed_spec[db_normed_spec < config["stft_min_val"]] = config["stft_min_val"]
-    clipped_db_normed_spec = db_normed_spec   
+    clipped_db_normed_spec = db_normed_spec  
     # 2.5)
     # shift into the positive range (so that we can use to_01). 
     # note that shifting by abs(stft_min_val) might not be optimal since if no vals got clipped we are shifting by too much 
     # (but I can't think of a better shift factor that wouldn't introduce an analogous problem of shifting too much/not shifting enough).
+    # picking np.min(clipped_db_normed_spec) as the shift factor would be the optimal choice BUT then it is not obvious how to undo that shift in the inverse. 
     # RANGE: [0, abs(stft_min_val)]
     clipped_db_normed_spec += abs(config["stft_min_val"])
     # 3) 
@@ -130,6 +133,7 @@ def spec_to_mel(normed_spec, numpy=False, debug=False):
     # shift into the positive range (so that we can use to_01)
     # note that shifting by abs(log_mel_min_val) might not be optimal since if no vals got clipped we are shifting by too much
     # (but I can't think of a better shift factor that wouldn't introduce an analogous problem of shifting too much/not shifting enough).
+    # picking np.min(clipped_db_mel_normed_spec) as the shift factor would be the optimal choice BUT then it is not obvious how to undo that shift in the inverse.
     # RANGE: [0, abs(log_mel_min_val) - 14]
     clipped_db_mel_normed_spec += abs(config["log_mel_min_val"])
     if debug: print_range(clipped_db_mel_normed_spec)
@@ -193,13 +197,11 @@ def spec_to_mel_inverse(spec, numpy=False, debug=False):
     if not numpy:
         normed_spec = torch.from_numpy(normed_spec)
 
-    # ATTENTION: I have noticed that normed_spec can slightly go beneath 0.
-    # the problem here is that we cannot reconstruct the clipped values resulting in some values in the low end of the range are too high which 
-    # by db transform are being mapped to smth that is too high (compared to what it was in the forward pass) which by the inverse mel pinv transform 
-    # are being mapped to a value that is < 0. I don't think I can do anything about this since this is a loss of information that leads to these deviations.
-    # 
-    # not sure this is a good solution but at least the "listen to the reconstruction" test goes well with this:
+    # ATTENTION: I have noticed that normed_spec can slightly go beneath 0 and above 1.
+    # I think this is due to the pseudoinverse being an imperfect inverse (my supervisors have confirmed that this could very well be the reason). 
+    # Since the deviations I have seen were all very small I will simply clip them back to 0 or 1 respectively.
     normed_spec[normed_spec < 0] = 0
+    normed_spec[normed_spec > 1] = 1
 
     return normed_spec
 
@@ -212,11 +214,10 @@ def spec_to_mel_inverse(spec, numpy=False, debug=False):
 # transforms forward and backward and comparing the result of that against the original input
 if __name__ == "__main__":
     import librosa
-    from tifresi.utils import load_signal
 
     # save input as wav for reference
     filename = librosa.util.example('brahms')
-    y, _ = load_signal(filename)
+    y = load(filename)
     y = y[:int(config["spec_x_len"] / 2)]  # less than spec_x_len because the brahms sample is not long enough
     unprocessed_spec = normed_spec(y)
     spec_to_wav(unprocessed_spec, "x_input.wav")
@@ -227,6 +228,6 @@ if __name__ == "__main__":
     spec_to_wav(recon, "x_recon_1.wav")
 
     # test spec_to_mel
-    mel_spec = spec_to_mel(unprocessed_spec, numpy=True, debug=True)
-    recon = spec_to_mel_inverse(mel_spec, numpy=True, debug=True)
+    mel_spec = spec_to_mel(unprocessed_spec, numpy=True)
+    recon = spec_to_mel_inverse(mel_spec, numpy=True)
     spec_to_wav(recon, "x_recon_2.wav")

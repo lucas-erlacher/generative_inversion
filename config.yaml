@@ -3,12 +3,12 @@
 sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in librosa.load) use by default
 
 
-
-
 # STFT
-spec_x_len: 12288 # making this smaller results in a VERY short sample that is hard to inspect auditively bc there is barely any sound on it
-stft_num_channels: 256 # making this larger makes the GPU run out of memory
-stft_hop_size: 16 # making this larger results in a reduncancy that is not good enough for the inverse STFT to yield a good sounding result
+# with the current params we will train on images of size x = 256 and y = 257
+spec_x_len: 8192 
+eval_spec_x_len: 65536  # need bigger specs when trying to inspect them in the wandb board (but spec_x_len has to be quite small or else memory will run out)
+stft_num_channels: 512
+stft_hop_size: 32
 # ACHTUNG: 
 # the following has to hold in order to have reconstructability: stft_num_channels / hop_size >= 4
 stft_min_val: -50 # = minimum allowed value of the spectrogram (in dB), this value was tweaked s.t. the output
@@ -20,8 +20,6 @@ stft_min_val: -50 # = minimum allowed value of the spectrogram (in dB), this val
 # and then in to_01 divide by stft_dyn_range_upper_bound and if abs(stft_min_val) >
 # stft_dyn_range_upper_bound then the resulting spec could end up containing values greater than 1. 
 stft_dyn_range_upper_bound: 50
-
-
 
 
 # MEL TRANSFORMATION

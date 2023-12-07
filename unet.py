@@ -1,4 +1,4 @@
-# this file has been taken from the tqdne repo (and then modified when needed)
+# this file has been taken from the tqdne repo (and then modified in some places)
 
 import torch
 from diffusers import get_cosine_schedule_with_warmup
@@ -15,21 +15,16 @@ from utils_train import to_starting_point, to_learning_space, quick_eval
 config = yaml.safe_load(open("config.yaml", "r"))
 
 # TODOs:
-# get the cnn to learn someting useful again (now with the reduced image size)
-# get unet to learn something useful
+# - get unet to learn something useful
 
 ################  PARAMETERS ################
 #training
 eval_freq = 500
 batch_size = 1
 max_epochs = 10
-loader = Loader()
-train_dataloader = loader.get_train_loader(batch_size)
-test_dataloader = loader.get_test_loader(batch_size)
 optimizer_params = {
     "learning_rate": 1e-4,
     "lr_warmup_steps": 500,
-    "n_train": len(train_dataloader) // batch_size,
     "seed": 0,
     "batch_size": batch_size,
     "max_epochs": max_epochs,
@@ -66,6 +61,13 @@ scheduler_params = {
     "prediction_type": prediction_type,
     "clip_sample": False,
 }
+
+################  LOADERS  ################
+
+loader = Loader()
+train_dataloader = loader.get_train_loader(batch_size)
+test_dataloader = loader.get_test_loader(batch_size)
+
 
 ################    MODEL   ################
 
@@ -141,14 +143,7 @@ class LightningDDMP(pl.LightningModule):
         optimizer = torch.optim.AdamW(
             self.net.parameters(), lr=self.optimizer_params["learning_rate"]
         )
-        lr_scheduler = get_cosine_schedule_with_warmup(
-            optimizer=optimizer,
-            num_warmup_steps=self.optimizer_params["lr_warmup_steps"],
-            num_training_steps=(
-                self.optimizer_params["n_train"] * self.optimizer_params["max_epochs"]
-            ),
-        )
-        return [optimizer], [lr_scheduler]
+        return [optimizer], []
 
 ################  TRAINING ################
 

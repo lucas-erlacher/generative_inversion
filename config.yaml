@@ -6,9 +6,9 @@ sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in libr
 
 
 # STFT
-spec_x_len: 65536 # 1048576 = 2^20, number of samples of each spectrogram (that we save)
-stft_num_channels: 256
-stft_hop_size: 256 
+spec_x_len: 12288 # making this smaller results in a VERY short sample that is hard to inspect auditively bc there is barely any sound on it
+stft_num_channels: 256 # making this larger makes the GPU run out of memory
+stft_hop_size: 16 # making this larger results in a reduncancy that is not good enough for the inverse STFT to yield a good sounding result
 # ACHTUNG: 
 # the following has to hold in order to have reconstructability: stft_num_channels / hop_size >= 4
 stft_min_val: -50 # = minimum allowed value of the spectrogram (in dB), this value was tweaked s.t. the output

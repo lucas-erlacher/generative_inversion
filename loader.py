@@ -2,15 +2,10 @@
 # I am (at least for now) choosing to not implement pytorch lightning Dataloaders beacuse I am not sure how to create them from a Huggingface dataset. 
 
 import os
-import time
 import yaml
-from tifresi.utils import load_signal
-import librosa
-from utils import normed_spec, print_range, spec_to_wav, load
-from transforms import spec_to_preprocessed_spec, spec_to_mel
-from datasets import Dataset
-from torch.utils.data import Dataset, DataLoader, IterableDataset
-from tinytag import TinyTag
+from utils import normed_spec, load
+from transforms import spec_to_mel
+from torch.utils.data import DataLoader, IterableDataset
 
 config = yaml.safe_load(open("config.yaml", "r"))
 
@@ -25,11 +20,7 @@ debug_limit_files = 20  # code breaks if this is too low e.g. 2
 train_dirs = ["2004", "2006", "2008", "2009", "2011", "2013", "2014"]
 test_dirs = ["2015", "2017", "2018"]
 
-def data_generator(valid_dirs, test):
-    spec_len = config["spec_x_len"]
-    if test:
-        spec_len = config["eval_spec_x_len"]
-    dir = "maestro-v3.0.0"
+def data_generator(valid_dirs, spec_len):
     # iterate over all subdirectories in the directory
     subfolders = [f.path for f in os.scandir(dir) if f.is_dir()]
     # filter for the valid dirs (this is how we enforce the train/test split (for now at least))
@@ -58,21 +49,13 @@ def data_generator(valid_dirs, test):
                     yield (log_mel_spec, unprocessed_spec)
 
 
-
-
 ################  DATALOADER  ################
 
 dataset_len = 0  # this values was obtained by running get_dataset_len
 
 class CustomDataset(IterableDataset):
-    def __init__(self, generator_func, split_type):  # split_type is either "train" or "test"
-        valid_dirs = None
-        self.split_type = split_type
-        if self.split_type == "train":
-            valid_dirs = train_dirs
-        elif self.split_type == "test":
-            valid_dirs = test_dirs
-        self.generator = generator_func(valid_dirs, test=(self.split_type == "test"))
+    def __init__(self, generator_func, valid_dirs, spec_len):  # split_type is either "train" or "test"
+        self.generator = generator_func(valid_dirs, spec_len)
 
     def __iter__(self):
         return self.generator
@@ -83,15 +66,18 @@ class CustomDataset(IterableDataset):
         except StopIteration:
             print("end of generator")
 
-
 class Loader:
     def __init__(self):
         self.num_workers = 1  # using more for some reason leads to RuntimeErrors
-        self.train_dataset = CustomDataset(data_generator, split_type="train")
-        self.test_dataset = CustomDataset(data_generator, split_type="test")
+        self.train_dataset = CustomDataset(data_generator, train_dirs, config["spec_x_len"])
+        self.test_dataset = CustomDataset(data_generator, test_dirs, config["spec_x_len"])
+        self.quick_eval_dataloader = CustomDataset(data_generator, test_dirs, config["eval_spec_x_len"])
 
     def get_train_loader(self, batch_size):
         return DataLoader(self.train_dataset, batch_size=batch_size)
     
     def get_test_loader(self, batch_size):
         return DataLoader(self.test_dataset, batch_size=batch_size)
+    
+    def get_quick_eval_loader(self, batch_size):
+        return DataLoader(self.quick_eval_dataloader, batch_size=batch_size)

@@ -1,3 +1,5 @@
+# NOTE: for the final/proper eval of the models we have to use the same size params as in the training
+
 ---
 # GERERAL
 sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in librosa.load) use by default
@@ -5,10 +7,14 @@ sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in libr
 
 # STFT
 # with the current params we will train on images of size x = 256 and y = 257
-spec_x_len: 8192 
+spec_x_len: 8192  # maybe we come to conclusion that this needs to be higher in order for the net to have the chance to learn something useful. 
+                  # in that case we also need to increase stft_hop_size if we want to keep square images (if stft_num_channels is unchanged)
+                  # note that increase of the stft_hop_size will likely make the pinv recon sound worse (which might be unproblematic for NN).
+                  # note that stft_hop_size cannot be increased arbitrarily if stft_num_channels is unchanged (stft_num_channels / hop_size >= 4).
 eval_spec_x_len: 65536  # need bigger specs when trying to inspect them in the wandb board (but spec_x_len has to be quite small or else memory will run out)
-stft_num_channels: 512
-stft_hop_size: 32
+stft_num_channels: 512  # I had to drop this from 1024 to 512 since otherwise I used too much memory
+stft_hop_size: 32  # this could from point of view of stft_num_channels / hop_size >= 4 be higher but then training input has very few x values. 
+                   # usually stft_hop_size is stft_num_channels / 2 or / 4 ( note that / 4 is an easier problem to solve). 
 # ACHTUNG: 
 # the following has to hold in order to have reconstructability: stft_num_channels / hop_size >= 4
 stft_min_val: -50 # = minimum allowed value of the spectrogram (in dB), this value was tweaked s.t. the output

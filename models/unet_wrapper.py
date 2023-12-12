@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from diffusers import UNet1DModel
 
-
 class UnetWrapper(nn.Module):
     def __init__(self, unet_params):
         super().__init__()

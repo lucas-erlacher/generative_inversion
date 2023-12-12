@@ -2,7 +2,6 @@
 
 from loader import Loader
 import pytorch_lightning as pl
-import yaml
 import torch
 from transforms import spec_to_mel_inverse, spec_to_preprocessed_spec, spec_to_preprocessed_spec_inverse
 import wandb
@@ -10,10 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import global_objects
 
-config = yaml.safe_load(open("config.yaml", "r"))
-
 class TrainClass(pl.LightningModule):
-    def __init__(self, batch_size):
+    def __init__(self, batch_size, eval_freq):
         super().__init__()
         self.batch_size = batch_size
         loader = Loader()
@@ -23,6 +20,7 @@ class TrainClass(pl.LightningModule):
         self.eval_set_size = 50
         self.bins = 200
         self.alpha = 0.5 
+        self.eval_freq = eval_freq
 
     def training_step(self, batch, batch_idx):
         _, _, _, loss = self.prepare_call_loss(batch)
@@ -31,8 +29,8 @@ class TrainClass(pl.LightningModule):
             self.quick_eval(self.batch_size, self.prepare_call_loss, self.quick_eval_dataloader, self)
         return {"loss": loss}
 
-    def to_starting_point(x): 
-            dim = (config["stft_num_channels"] // 2) + 1
+    def to_starting_point(self, x): 
+            dim = (global_objects.config["stft_num_channels"] // 2) + 1
             new_x = torch.zeros(x.shape[0], dim, x.shape[2])  # I will change the y-dim of the specs and pytorch does not allow me to write that back into x
             for i in range(x.shape[0]):  # TODO: very likely can be parallelized over the batch dim
                 spec = x[i]
@@ -106,12 +104,12 @@ class TrainClass(pl.LightningModule):
         x = self.from_learning_space(x[0].detach().cpu().numpy())
         y_hat = self.from_learning_space(y_hat[0].detach().cpu().numpy())
         y = self.from_learning_space(y[0].detach().cpu().numpy())
-        wandb.log({"audio": [wandb.Audio(global_objects.stft_system.invert_spectrogram(x), caption="input", sample_rate=config["sampling_rate"]), 
-                                wandb.Audio(global_objects.stft_system.invert_spectrogram(y_hat), caption="output", sample_rate=config["sampling_rate"]), 
-                                wandb.Audio(global_objects.stft_system.invert_spectrogram(y), caption="target", sample_rate=config["sampling_rate"])]})
+        wandb.log({"audio": [wandb.Audio(global_objects.stft_system.invert_spectrogram(x), caption="input", sample_rate=global_objects.config["sampling_rate"]), 
+                                wandb.Audio(global_objects.stft_system.invert_spectrogram(y_hat), caption="output", sample_rate=global_objects.config["sampling_rate"]), 
+                                wandb.Audio(global_objects.stft_system.invert_spectrogram(y), caption="target", sample_rate=global_objects.config["sampling_rate"])]})
         
     # average loss over entire test set (the quick evals are only over a subset of test set)
-    def final_eval(training_class, final_eval_dataloader):
+    def final_eval(self, training_class, final_eval_dataloader):
         counter = 0
         loss = 0
         for batch in final_eval_dataloader:

@@ -1,17 +1,14 @@
-import torch
-import yaml
-from train_classes.train_class import TrainClass
-import pytorch_lightning as pl
-from torch.optim import Adam
-from pytorch_lightning.loggers import WandbLogger
+# this train class is currently used for the baseline_cnn
 
-config = yaml.safe_load(open("config.yaml", "r")) 
+import torch
+from train_classes.train_class import TrainClass
+from torch.optim import Adam
 
 ################  LIGHTNING TRAINING WRAPPER  ################
 
-class TrainConcolutional(TrainClass):
-    def __init__(self, model, batch_size):
-        super().__init__(batch_size)
+class TrainConvolutional(TrainClass):
+    def __init__(self, model, batch_size, eval_freq):
+        super().__init__(batch_size, eval_freq)
         self.model = model
     
     # does all the computations that can be reused for training and validation

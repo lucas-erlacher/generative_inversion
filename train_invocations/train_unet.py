@@ -1,15 +1,21 @@
-from train_generative import TrainGenerative
+import sys
+sys.path.append("../")
+from train_classes.train_generative import TrainGenerative
 from models.unet_wrapper import UnetWrapper
 from pytorch_lightning.loggers import WandbLogger
 from diffusers import DDPMScheduler
 import pytorch_lightning as pl
-import yaml
+import global_objects
 
-config = yaml.safe_load(open("config.yaml", "r"))
+# TODOs: 
+# use proper unet params 
+# how can I use longer board specs if I have to set all these params to one value?
+# use proper data params
+
 
 ################  PARAMETERS  ################
 #training
-eval_freq = 500
+eval_freq = 5
 batch_size = 1
 max_epochs = 10
 optimizer_params = {
@@ -29,12 +35,12 @@ trainer_params = {
     "num_nodes": 1}
 # model
 prediction_type = "sample"
-channels = config["stft_num_channels"]
+channels = global_objects.config["stft_num_channels"]
 timestep = 1 
 unet_params = {
-    "sample_size": config["spec_x_len"],  # x-axis len = x_len/hop_size
-    "in_channels": config["stft_num_channels"],  # channels = "y-axis" = freq dims of specs
-    "out_channels": config["stft_num_channels"],  # should be same as in_channels
+    "sample_size": 1,  # x-axis len = x_len/hop_size
+    "in_channels": 1,  # channels = "y-axis" = freq dims of specs
+    "out_channels": 1,  # should be same as in_channels
     "block_out_channels":  (32, 64, 128),
     "down_block_types": ('DownBlock1D', 'DownBlock1D', 'AttnDownBlock1D'),
     "up_block_types": ('AttnUpBlock1D', 'UpBlock1D', 'UpBlock1D'),
@@ -57,7 +63,7 @@ scheduler_params = {
 if __name__ == "__main__":
     scheduler = DDPMScheduler(**scheduler_params)
     model_wrapper = UnetWrapper(unet_params)
-    training_class = TrainGenerative(model_wrapper, scheduler, optimizer_params=optimizer_params)
+    training_class = TrainGenerative(model_wrapper, scheduler, optimizer_params, batch_size, eval_freq)
     wandb_logger = WandbLogger(project='generative inversion')
     trainer = pl.Trainer(max_epochs=max_epochs, logger=wandb_logger)
     trainer.fit(model=training_class, train_dataloaders=training_class.train_dataloader)

@@ -1,21 +1,18 @@
-# this file has been taken from the tqdne repo (and then modified in some places)
+# this train_class is currently used for the unet and the diffusion model
 
 import torch
 from tqdne_diffusers import DDPMPipeline1DCond
 from train_classes.train_class import TrainClass
-import yaml
-
-
-config = yaml.safe_load(open("config.yaml", "r"))
 
 ################  LIGHTNING TRAINING WRAPPER  ################
 
 class TrainGenerative(TrainClass):
-    def __init__(self, model_wrapper, optimizer_params, batch_size, eval_freq):
-        super().__init__(batch_size)
+    def __init__(self, model_wrapper, scheduler, optimizer_params, batch_size, eval_freq):
+        super().__init__(batch_size, eval_freq)
         self.batch_size = batch_size
         self.eval_freq = eval_freq
         self.net = model_wrapper  # unfortunately pytorch lightning forces me to call the model_wrapper net
+        self.noise_scheduler = scheduler
         self.optimizer_params = optimizer_params
         self.pipeline = DDPMPipeline1DCond(self.net, self.noise_scheduler)
 

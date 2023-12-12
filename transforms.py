@@ -9,14 +9,10 @@
 # By default the inputs and outputs of the functions are expected to be torch tensors (since these functions will be used as part of a DL model/pipeline). 
 # Alternatively the numpy flag can be set to true (is false by default) which will make the function accept and return numpy arrays.
 
-
-import yaml
 import numpy as np
 from utils import db_transform, to_01, db_inverse, spec_to_wav, normed_spec, print_range, undo_to_01, load
 import global_objects
 import torch
-
-config = yaml.safe_load(open("config.yaml", "r"))
 
 
 
@@ -42,7 +38,7 @@ def spec_to_preprocessed_spec(normed_spec, numpy=False):
     # 2)
     # clip very negative values
     # RANGE: [stft_min_val, 0]
-    db_normed_spec[db_normed_spec < config["stft_min_val"]] = config["stft_min_val"]
+    db_normed_spec[db_normed_spec < global_objects.config["stft_min_val"]] = global_objects.config["stft_min_val"]
     clipped_db_normed_spec = db_normed_spec  
     # 2.5)
     # shift into the positive range (so that we can use to_01). 
@@ -50,11 +46,11 @@ def spec_to_preprocessed_spec(normed_spec, numpy=False):
     # (but I can't think of a better shift factor that wouldn't introduce an analogous problem of shifting too much/not shifting enough).
     # picking np.min(clipped_db_normed_spec) as the shift factor would be the optimal choice BUT then it is not obvious how to undo that shift in the inverse. 
     # RANGE: [0, abs(stft_min_val)]
-    clipped_db_normed_spec += abs(config["stft_min_val"])
+    clipped_db_normed_spec += abs(global_objects.config["stft_min_val"])
     # 3) 
     # transform to [0, 1] (which might be easier for the NN to learn)
     # RANGE: [0, 1]
-    normed_clipped_db_normed_spec = to_01(clipped_db_normed_spec, config["stft_dyn_range_upper_bound"]) 
+    normed_clipped_db_normed_spec = to_01(clipped_db_normed_spec, global_objects.config["stft_dyn_range_upper_bound"]) 
     # convert back to tensor if necessary
     if not numpy:
         normed_clipped_db_normed_spec = torch.from_numpy(normed_clipped_db_normed_spec)
@@ -75,12 +71,12 @@ def spec_to_preprocessed_spec_inverse(spec, numpy=False):
     # 3)
     # to_01 normalization can be undone
     # RANGE: [0, stft_dyn_range_upper_bound]
-    clipped_db_normed_spec = undo_to_01(spec, config["stft_dyn_range_upper_bound"])
+    clipped_db_normed_spec = undo_to_01(spec, global_objects.config["stft_dyn_range_upper_bound"])
     # 2.5)
     # invert 2.5 (otherwise recon will be heavily distorted). 
     # RANGE: [stft_min_val, 0]
     # upper bound being 0 assumes stft_dyn_range_upper_bound = abs(stft_min_val) (which is currently the case in the config file)
-    clipped_db_normed_spec -= abs(config["stft_min_val"])
+    clipped_db_normed_spec -= abs(global_objects.config["stft_min_val"])
     # 2)
     # clipping can't be undone since we don't know which (if any) values got clipped
     # RANGE: RANGE: [stft_min_val, 0]
@@ -126,7 +122,7 @@ def spec_to_mel(normed_spec, numpy=False, debug=False):
     # 3) 
     # clip very negative values
     # RANGE: [log_mel_min_val, -14]
-    db_mel_normed_spec[db_mel_normed_spec < config["log_mel_min_val"]] = config["log_mel_min_val"]
+    db_mel_normed_spec[db_mel_normed_spec < global_objects.config["log_mel_min_val"]] = global_objects.config["log_mel_min_val"]
     clipped_db_mel_normed_spec = db_mel_normed_spec   
     if debug: print_range(clipped_db_mel_normed_spec)
     # 3.5)
@@ -135,12 +131,12 @@ def spec_to_mel(normed_spec, numpy=False, debug=False):
     # (but I can't think of a better shift factor that wouldn't introduce an analogous problem of shifting too much/not shifting enough).
     # picking np.min(clipped_db_mel_normed_spec) as the shift factor would be the optimal choice BUT then it is not obvious how to undo that shift in the inverse.
     # RANGE: [0, abs(log_mel_min_val) - 14]
-    clipped_db_mel_normed_spec += abs(config["log_mel_min_val"])
+    clipped_db_mel_normed_spec += abs(global_objects.config["log_mel_min_val"])
     if debug: print_range(clipped_db_mel_normed_spec)
     # 4) 
     # transform to [0,1] because the output of this method is supposed to be the input to a NN and being in [0,1] might make the NN's life easier)
     # RANGE: [0, 1] 
-    normed_clipped_db_mel_normed_spec = to_01(clipped_db_mel_normed_spec, config["log_mel_dyn_range_upper_bound"])
+    normed_clipped_db_mel_normed_spec = to_01(clipped_db_mel_normed_spec, global_objects.config["log_mel_dyn_range_upper_bound"])
     if debug: 
         print_range(normed_clipped_db_mel_normed_spec)
         print()
@@ -167,13 +163,13 @@ def spec_to_mel_inverse(spec, numpy=False, debug=False):
     # 4)
     # to_01 normalization can be undone
     # RANGE: [0, log_mel_dyn_range_upper_bound]
-    clipped_db_mel_normed_spec = undo_to_01(spec, config["log_mel_dyn_range_upper_bound"])
+    clipped_db_mel_normed_spec = undo_to_01(spec, global_objects.config["log_mel_dyn_range_upper_bound"])
     if debug: print_range(clipped_db_mel_normed_spec)
     # 3.5)
     # invert 3.5 (otherwise recon will be heavily distorted).
     # RANGE: [log_mel_min_val, 0]
     # upper bound being 0 assumes log_mel_dyn_range_upper_bound = abs(log_mel_min_val) (which is currently the case in the config file) 
-    clipped_db_mel_normed_spec -= abs(config["log_mel_min_val"])
+    clipped_db_mel_normed_spec -= abs(global_objects.config["log_mel_min_val"])
     if debug: print_range(clipped_db_mel_normed_spec)
     # 3)
     # clipping can't be undone
@@ -218,7 +214,7 @@ if __name__ == "__main__":
     # save input as wav for reference
     filename = librosa.util.example('brahms')
     y = load(filename)
-    y = y[:int(config["spec_x_len"] / 2)]  # less than spec_x_len because the brahms sample is not long enough
+    y = y[:int(global_objects.config["spec_x_len"] / 2)]  # less than spec_x_len because the brahms sample is not long enough
     unprocessed_spec = normed_spec(y)
     spec_to_wav(unprocessed_spec, "x_input.wav")
     

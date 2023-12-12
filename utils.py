@@ -1,13 +1,13 @@
 import matplotlib.pyplot as plt
 from scipy.io.wavfile import write
-import yaml
 import global_objects
 import numpy as np
 import torch
 from tinytag import TinyTag
 import librosa
+import global_objects   
 
-config = yaml.safe_load(open("config.yaml", "r"))
+
 
 ########  NORMALIZATION  ########
 
@@ -29,7 +29,7 @@ def normed_spec(wave):
     spec = global_objects.stft_system.spectrogram(wave)
     # normalize to [0,1] (only if necessary)
     if np.max(spec) > 1:
-        spec = to_01(spec, config["stft_dyn_range_upper_bound"])
+        spec = to_01(spec, global_objects.config["stft_dyn_range_upper_bound"])
     return spec
 
 ########  STATS  ########
@@ -61,7 +61,7 @@ def plot_spec(spec, title):
 # useful for finding out which spec in a chain of specs is the first to go south
 def spec_to_wav(spec, title):
     wave = global_objects.stft_system.invert_spectrogram(spec)
-    write(title, config['sampling_rate'], wave)
+    write(title, global_objects.config['sampling_rate'], wave)
 
 ########  OTHER  ########
 

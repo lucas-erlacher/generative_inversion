@@ -1,0 +1,27 @@
+import pytorch_lightning as pl
+from models.baseline_cnn import Baseline_CNN
+from train_classes.train_convolutional import TrainConcolutional
+from pytorch_lightning.loggers import WandbLogger
+ 
+################  PARAMETERS  ################
+
+# training
+batch_size = 4
+lr = 0.0001
+max_epochs = 10
+eval_freq = 5
+# model
+kernel_size = 5
+pred_diff = True  # switch betwwen predicting the full spec or the diff to the target spec
+
+################  TRAINING INVOCATION  ################
+
+if __name__ == '__main__':
+    model = Baseline_CNN(kernel_size, pred_diff)
+    training_class = TrainConcolutional(model, batch_size)
+    wandb_logger = WandbLogger(project='generative inversion')
+    trainer = pl.Trainer(max_epochs=max_epochs, logger=wandb_logger)
+    trainer.fit(model=training_class, train_dataloaders=training_class.train_dataloader)
+
+    # final eval
+    final_loss = training_class.final_eval(training_class, training_class.final_eval_dataloader)

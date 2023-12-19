@@ -3,6 +3,8 @@
 import torch
 from train_classes.train_class import TrainClass
 from torch.optim import Adam
+from models.cnn_1D import Cnn1D
+from models.cnn_2D import Cnn2D
 
 ################  LIGHTNING TRAINING WRAPPER  ################
 
@@ -25,12 +27,7 @@ class TrainConvolutional(TrainClass):
         x = x.float()
         y = y.float()
 
-        x = x.unsqueeze(1)  # add channel dimension
-
         y_hat = self.model(x)  # forward pass
-
-        x = x.squeeze(1)  # remove channel dimension
-        y_hat = y_hat.squeeze(1)  # remove channel dimension
 
         y_hat = y_hat.to('cuda') # when called from train_step this has already been done by pytorch lightninig, but not when called from quick_eval
         y = y.to('cuda')         # when called from train_step this has already been done by pytorch lightninig, but not when called from quick_eval

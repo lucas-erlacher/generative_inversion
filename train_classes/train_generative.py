@@ -26,29 +26,17 @@ class TrainGenerative(TrainClass):
         x = x.to('cuda')
         y = y.to('cuda')
 
-        batch_size = x.shape[0]
-        second_dim = x.shape[2]
-
-        # reshape input to the format that the huggingface lib expects
-        x = x.flatten(1).float()
-        y = y.flatten(1).float()
-
-        x.unsqueeze_(1)  # add channel dimension
+        x = x.float()
+        y = y.float()
 
         y_hat = self.net.timestep_forward(x)  # forward pass
         # some transforms need the input to be in [0,1] 
         y_hat = torch.sigmoid(y_hat)
 
-        x = x.squeeze(1)  # remove channel dimension
-
         loss = torch.nn.functional.mse_loss(y_hat, y)
 
         self.log("train_loss", loss)
 
-        # reshape back into a 2D matrix
-        x = x.reshape(batch_size, -1, second_dim)
-        y_hat = y_hat.reshape(batch_size, -1, second_dim)
-        y = y.reshape(batch_size, -1, second_dim)
         return x, y, y_hat, loss
     
     def configure_optimizers(self):

@@ -30,13 +30,13 @@ class TrainClass(pl.LightningModule):
         return {"loss": loss}
 
     def to_starting_point(self, x): 
-            dim = (global_objects.config["stft_num_channels"] // 2) + 1
-            new_x = torch.zeros(x.shape[0], dim, x.shape[2])  # I will change the y-dim of the specs and pytorch does not allow me to write that back into x
-            for i in range(x.shape[0]):  # TODO: very likely can be parallelized over the batch dim
-                spec = x[i]
-                inv = spec_to_mel_inverse(spec)
-                new_x[i] = inv 
-            return new_x
+        dim = (global_objects.config["stft_num_channels"] // 2) + 1
+        new_x = torch.zeros(x.shape[0], dim, x.shape[2])  # I will change the y-dim of the specs and pytorch does not allow me to write that back into x
+        for i in range(x.shape[0]):  # TODO: very likely can be parallelized over the batch dim
+            spec = x[i]
+            inv = spec_to_mel_inverse(spec)
+            new_x[i] = inv
+        return new_x
         
     # we might not want to learn in the space that the data lives in, this method moves x and y to a potentially more suitable space for learning.
     # right now we are moving them into the log space (with spec_to_preprocessed_spec) in the hopes that there learning will be easier 

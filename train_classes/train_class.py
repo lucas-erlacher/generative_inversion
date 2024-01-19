@@ -17,7 +17,6 @@ import librosa
 import soundfile as sf
 
 # TODO: 
-# - try more generation steps in diffusion model
 # - see other TODOs in Google Doc
 
 log_memory_usage = False  # for debugging

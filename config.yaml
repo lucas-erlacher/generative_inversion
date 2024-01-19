@@ -36,4 +36,4 @@ log_mel_dyn_range_upper_bound: 50
 
 
 # DIFFUSION MODEL
-diff_num_inference_steps: 10
+diff_num_inference_steps: 100

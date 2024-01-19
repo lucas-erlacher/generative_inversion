@@ -1,3 +1,5 @@
 ./maestro-v3.0.0
 ./dataset
 ./__pycache__
+lightning_logs
+wandb

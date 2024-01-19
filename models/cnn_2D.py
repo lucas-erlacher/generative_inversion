@@ -3,7 +3,8 @@ from torch import nn
 
 class Cnn2D(torch.nn.Module):    
     def __init__(self, kernel_size, pred_diff):
-        super().__init__()        
+        super().__init__()   
+        self.name = "cnn_2D"     
         self.pred_diff = pred_diff
         self.act_func = nn.ReLU()
         self.conv1 = nn.Conv2d(kernel_size=kernel_size, in_channels=1, out_channels=8, padding=2) 

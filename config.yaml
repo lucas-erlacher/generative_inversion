@@ -28,7 +28,7 @@ stft_dyn_range_upper_bound: 50
 
 
 # MEL TRANSFORMATION
-mel_num_channels: 64
+mel_num_channels: 80
 log_mel_min_val: -50 # = minimum allowed value of the log mel spectrogram (in dB)
 # ACHTUNG:
 # abs(log_mel_min_val) has to be <= log_mel_dyn_range_upper_bound for the same reason as above. 
@@ -36,4 +36,4 @@ log_mel_dyn_range_upper_bound: 50
 
 
 # DIFFUSION MODEL
-diff_num_inference_steps: 100
+diff_num_inference_steps: 10

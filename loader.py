@@ -2,7 +2,7 @@
 # I am (at least for now) choosing to not implement pytorch lightning Dataloaders beacuse I am not sure how to create them from a Huggingface dataset. 
 
 import os
-from utils import normed_spec, load
+from utils_lucas import normed_spec, load
 from transforms import spec_to_mel
 from torch.utils.data import DataLoader, IterableDataset
 import global_objects
@@ -15,7 +15,7 @@ debug_limit_folders = 1
 debug_limit_files = 20  # code breaks if this is too low e.g. 2
 
 # TODO: this is might not be good since I might have some systematic biases in both the train and test sets. 
-dir = "/itet-stor/elucas/net_scratch/generative_inversion/maestro-v3.0.0"
+dir = "/itet-stor/elucas/net_scratch/maestro-v3.0.0"
 train_dirs = ["2004", "2006", "2008", "2009", "2011", "2013", "2014"]
 test_dirs = ["2015", "2017", "2018"]
 
@@ -69,7 +69,7 @@ class Loader:
     def __init__(self):
         self.num_workers = 1  # using more for some reason leads to RuntimeErrors
         self.train_dataset = CustomDataset(data_generator, train_dirs, global_objects.config["spec_x_len"])
-        self.test_dataset = CustomDataset(data_generator, test_dirs, global_objects.config["spec_x_len"])
+        self.test_dataset = CustomDataset(data_generator, test_dirs, global_objects.config["eval_spec_x_len"])
         self.quick_eval_dataloader = CustomDataset(data_generator, test_dirs, global_objects.config["eval_spec_x_len"])
 
     def get_train_loader(self, batch_size):

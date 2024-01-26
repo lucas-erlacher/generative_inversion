@@ -1,3 +1,6 @@
+# unfortunately I can't simply name this file utils since there is another utils file is in the bigVGAN repo 
+# (and I don't want to change all imports of that file)
+
 import matplotlib.pyplot as plt
 from scipy.io.wavfile import write
 import global_objects

@@ -10,7 +10,7 @@
 # Alternatively the numpy flag can be set to true (is false by default) which will make the function accept and return numpy arrays.
 
 import numpy as np
-from utils import db_transform, to_01, db_inverse, spec_to_wav, normed_spec, print_range, undo_to_01, load
+from utils_lucas import db_transform, to_01, db_inverse, spec_to_wav, normed_spec, print_range, undo_to_01, load
 import global_objects
 import torch
 

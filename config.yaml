@@ -10,7 +10,7 @@ spec_x_len: 32768  # maybe we come to conclusion that this needs to be higher in
                   # note that stft_hop_size cannot be increased arbitrarily if stft_num_channels is unchanged (stft_num_channels / hop_size >= 4).
 eval_spec_x_len: 65536  # need bigger specs when trying to inspect them in the wandb board (but spec_x_len has to be quite small or else memory will run out)
 stft_num_channels: 1024  # I had to drop this from 1024 to 512 since otherwise I used too much memory
-stft_hop_size: 128  # usually stft_hop_size is stft_num_channels / 2 or / 4 ( note that / 4 is an easier problem to solve)
+stft_hop_size: 256  # usually stft_hop_size is stft_num_channels / 2 or / 4 ( note that / 4 is an easier problem to solve)
                     # right now it is / 8 though because then the x_len of the specs that we train on is longer
 
 

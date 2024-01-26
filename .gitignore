@@ -4,3 +4,8 @@
 lightning_logs
 wandb
 checkpoints
+
+# pyc files
+*.pyc
+/train_classes/frechet_y/*
+/train_classes/frechet_y_hat/*

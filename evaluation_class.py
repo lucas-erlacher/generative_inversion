@@ -10,21 +10,26 @@ import global_objects
 import torch
 
 class EvaluationClass:
-    eval_set_size = 100
+    eval_set_size = 2
 
     # pretrained indicates whether we are evaluating a pretrained baseline-model or a model that we trained ourselves
-    def __init__(self, model, final_eval_dataloader, pretrained=False):
+    def __init__(self, model, final_eval_dataloader, pretrained=False, name=None):
         self.model = model
         self.final_eval_dataloader = final_eval_dataloader
         self.pretrained = pretrained
+        self.name = name
 
     def eval(self, train_class):
         # compute final eval metrics
         metrics = dict() 
         frechet = FrechetAudioDistance(model_name="vggish", sample_rate=16000, use_pca=False, use_activation=False, verbose=False)
         sum_mse = 0
+        sum_l1 = 0
         sum_cos_sim_row = 0
         sum_cos_sim_col = 0
+        sum_cos_sim_flattened = 0
+        sum_waveform_dist_baseline = 0
+        sum_waveform_dist = 0
         frechet_y = []
         frechet_y_hat = []
         counter = 0
@@ -33,17 +38,24 @@ class EvaluationClass:
                 if i == self.eval_set_size:
                     break
                 counter += 1
-                x = None
-                y = None
+                x, y = batch
                 y_hat = None
                 loss = None
                 if not self.pretrained:
                     x, y, y_hat, loss = train_class.prepare_call_loss(batch, diffusion_generate=True)  # we are dealine with one of our models
                 else:
-                    self.model.forward(batch)  # we are dealing with a pretrained baseline model
+                    y_hat = self.model.forward(x)  # we are dealing with a pretrained baseline model
+                    y_hat_spec = torch.zeros(y.shape)
+                    for i in range(y_hat.shape[0]):
+                        y_hat_spec[i] = torch.tensor(global_objects.stft_system.spectrogram(y_hat.squeeze(1)[i].detach().cpu().numpy()))
+                    y_hat = y_hat_spec
+                    loss = F.mse_loss(y_hat, y)
                 ####  MSE  ####
                 reduced_loss = torch.mean(loss, dim=0)  # need to reduce over batch dim
                 sum_mse += reduced_loss
+                ####  L1  ####
+                l1 = F.l1_loss(y, y_hat)
+                sum_l1 = torch.mean(l1, dim=0)  # need to reduce over batch dim
                 ####  COS SIM  ####
                 sim = F.cosine_similarity(y, y_hat, dim=1)
                 normd_sim = self.normalize_cos_sim(sim)
@@ -55,10 +67,26 @@ class EvaluationClass:
                 reduced_sim = torch.mean(normd_sim, dim=0)  # need to reduce over batch dim
                 reduced_sim = torch.mean(reduced_sim, dim=0)  # need to reduce over cols
                 sum_cos_sim_col += reduced_sim
+                # flattened
+                y_flat = y.reshape(y.shape[0], -1) 
+                y_hat_flat = y_hat.reshape(y_hat.shape[0], -1)
+                sim = F.cosine_similarity(y_flat, y_hat_flat, dim=1)
+                normd_sim = self.normalize_cos_sim(sim)
+                reduced_sim = torch.mean(normd_sim, dim=0)  # need to reduce over batch dim
+                sum_cos_sim_flattened += reduced_sim
                 ####  FRECHET  ####
                 for i in range(x.shape[0]):
                     frechet_y.append(y[i].detach().cpu().numpy())
                     frechet_y_hat.append(y_hat[i].detach().cpu().numpy())
+                ####  WAVEFORM DIST  ####
+                # baseline
+                for i in range(x.shape[0]):
+                    spec = torch.tensor(global_objects.stft_system.spectrogram(global_objects.stft_system.invert_spectrogram(y[i].detach().cpu().numpy())))
+                    sum_waveform_dist_baseline += F.mse_loss(spec, y[i])
+                # normal waveform dist
+                for i in range(x.shape[0]):
+                    spec = torch.tensor(global_objects.stft_system.spectrogram(global_objects.stft_system.invert_spectrogram(y_hat[i].detach().cpu().numpy())))
+                    sum_waveform_dist += F.mse_loss(spec, y[i])
         ####  FRECHET  ####
         # preprocess data
         curr_path = "/itet-stor/elucas/net_scratch/generative_inversion/train_classes/"
@@ -73,12 +101,20 @@ class EvaluationClass:
         frechet_score = frechet.score(curr_path + "/frechet_y", curr_path + "/frechet_y_hat", dtype="float32")
         
         metrics["mse"] = (sum_mse / counter).item()
+        metrics["l1"] = (sum_l1 / counter).item()
         metrics["row_wise_cos_sim"] = (sum_cos_sim_row / counter).item()
         metrics["rol_wise_cos_sim"] = (sum_cos_sim_col / counter).item()
+        metrics["flattened_cos_sim"] = (sum_cos_sim_flattened / counter).item()
         metrics["frechet_audio_dist"] = frechet_score
+        metrics["waveform_dist_baseline"] = (sum_waveform_dist_baseline / counter).item()
+        metrics["waveform_dist"] = (sum_waveform_dist / counter).item()
 
         # write metrics to txt file
-        with open(train_class.checkpoints_path + "/metrics.txt", "w") as f:
+        if self.pretrained == False:
+            path = train_class.checkpoints_path + "/metrics.txt"
+        else:
+            path = "/itet-stor/elucas/net_scratch/generative_inversion/" + "metrics_" + self.name + ".txt"
+        with open(path, "w") as f:
             for key, value in metrics.items():
                 f.write(str(key) + ": " + str(value) + "\n")
 

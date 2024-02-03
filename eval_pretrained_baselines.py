@@ -13,7 +13,6 @@ if __name__ == "__main__":
     models = []
 
     '''
-
     # set sr to 16000
     # ...
 

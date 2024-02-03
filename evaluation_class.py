@@ -1,4 +1,4 @@
-# this class performs the final evaluation of both our models and the baseline models 
+# this class performs the final evaluation of both our models and the pretrained baseline models 
 
 import torch.nn.functional as F
 from frechet_audio_distance import FrechetAudioDistance
@@ -39,11 +39,13 @@ class EvaluationClass:
                     break
                 counter += 1
                 x, y = batch
+
+                ########  FORWARD PASS  ########
                 y_hat = None
                 loss = None
-                if not self.pretrained:
+                if not self.pretrained:  # the non pretrained models have a method called prepare_call_loss
                     x, y, y_hat, loss = train_class.prepare_call_loss(batch, diffusion_generate=True)  # we are dealine with one of our models
-                else:
+                else:  # the pretrained models only have the forward method
                     if not self.name == "simple_baseline":  # all the baselines that are not simple_baseline return a waveform
                         # audioldm2 needs special treatment
                         if self.name == "audioldm2":
@@ -57,6 +59,8 @@ class EvaluationClass:
                     else:  # simple_baseline returns a spec
                         y_hat = self.model.forward(x)
                     loss = F.mse_loss(y_hat, y)
+
+                ########  COMPUTE METRICS  ########
                 ####  MSE  ####
                 reduced_loss = torch.mean(loss, dim=0)  # need to reduce over batch dim
                 sum_mse += reduced_loss

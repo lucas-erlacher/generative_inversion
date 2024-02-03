@@ -1,6 +1,8 @@
 ---
 # GERERAL
 sampling_rate: 22050 # this is the sr that tifresi and librosa (at least in librosa.load) use by default
+                     # audioldm2 uses sample rate of 16000
+                     # everything else uses 22050
 
 
 # STFT
@@ -11,7 +13,6 @@ spec_x_len: 32768  # maybe we come to conclusion that this needs to be higher in
 eval_spec_x_len: 65536  # need bigger specs when trying to inspect them in the wandb board (but spec_x_len has to be quite small or else memory will run out)
 stft_num_channels: 1024  # I had to drop this from 1024 to 512 since otherwise I used too much memory
 stft_hop_size: 256  # usually stft_hop_size is stft_num_channels / 2 or / 4 ( note that / 4 is an easier problem to solve)
-                    # right now it is / 8 though because then the x_len of the specs that we train on is longer
 
 
 # ACHTUNG: 
@@ -28,7 +29,7 @@ stft_dyn_range_upper_bound: 50
 
 
 # MEL TRANSFORMATION
-mel_num_channels: 80
+mel_num_channels: 80  # audiolm2: 64, everything else: 80
 log_mel_min_val: -50 # = minimum allowed value of the log mel spectrogram (in dB)
 # ACHTUNG:
 # abs(log_mel_min_val) has to be <= log_mel_dyn_range_upper_bound for the same reason as above. 

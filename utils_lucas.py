@@ -80,5 +80,5 @@ def db_inverse(array):
 
 def load(path):
     data = TinyTag.get(path)
-    y, _ = librosa.load(path)
+    y, _ = librosa.load(path, sr=global_objects.config["sampling_rate"])
     return y

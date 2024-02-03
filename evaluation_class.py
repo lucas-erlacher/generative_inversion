@@ -44,11 +44,18 @@ class EvaluationClass:
                 if not self.pretrained:
                     x, y, y_hat, loss = train_class.prepare_call_loss(batch, diffusion_generate=True)  # we are dealine with one of our models
                 else:
-                    y_hat = self.model.forward(x)  # we are dealing with a pretrained baseline model
-                    y_hat_spec = torch.zeros(y.shape)
-                    for i in range(y_hat.shape[0]):
-                        y_hat_spec[i] = torch.tensor(global_objects.stft_system.spectrogram(y_hat.squeeze(1)[i].detach().cpu().numpy()))
-                    y_hat = y_hat_spec
+                    if not self.name == "simple_baseline":  # all the baselines that are not simple_baseline return a waveform
+                        # audioldm2 needs special treatment
+                        if self.name == "audioldm2":
+                            x = x[:, :, ::4]  # audioldm2 internally upsamples the time dimension of the spec by a factor of 4
+                            x.permute(0, 2, 1)  # the vocoder has time dim first and then mel dim
+                        y_hat = self.model.forward(x)  # we are dealing with a pretrained baseline model
+                        y_hat_spec = torch.zeros(y.shape)
+                        for i in range(y_hat.shape[0]):
+                            y_hat_spec[i] = torch.tensor(global_objects.stft_system.spectrogram(y_hat.squeeze(1)[i].detach().cpu().numpy()))
+                        y_hat = y_hat_spec   
+                    else:  # simple_baseline returns a spec
+                        y_hat = self.model.forward(x)
                     loss = F.mse_loss(y_hat, y)
                 ####  MSE  ####
                 reduced_loss = torch.mean(loss, dim=0)  # need to reduce over batch dim
@@ -82,10 +89,14 @@ class EvaluationClass:
                 # baseline
                 for i in range(x.shape[0]):
                     spec = torch.tensor(global_objects.stft_system.spectrogram(global_objects.stft_system.invert_spectrogram(y[i].detach().cpu().numpy())))
+                    if not self.pretrained:
+                        spec = spec.to("cuda")
                     sum_waveform_dist_baseline += F.mse_loss(spec, y[i])
                 # normal waveform dist
                 for i in range(x.shape[0]):
                     spec = torch.tensor(global_objects.stft_system.spectrogram(global_objects.stft_system.invert_spectrogram(y_hat[i].detach().cpu().numpy())))
+                    if not self.pretrained:
+                        spec = spec.to("cuda")
                     sum_waveform_dist += F.mse_loss(spec, y[i])
         ####  FRECHET  ####
         # preprocess data

@@ -1,0 +1,13 @@
+# contains the commands to run and control the job on the slurm cluster
+
+
+
+
+# run the job
+sbatch /itet-stor/elucas/net_scratch/generative_inversion/job_running/run_cluster_job.sh
+
+# see all jobs/check the status of the job
+squeue -u elucas
+
+# cancel the job
+scancel job_id

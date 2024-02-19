@@ -10,9 +10,9 @@ import math
 
 ################  PARAMETERS  ################
 # training
-eval_freq = 2
+eval_freq = 500
 batch_size = 32
-max_epochs = 10 
+max_epochs = 100  # does not have an effect because I have a IterableDataset
 optimizer_params = {
     "learning_rate": 1e-4,
     "seed": 0,

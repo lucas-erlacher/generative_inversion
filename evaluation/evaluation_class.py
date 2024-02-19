@@ -1,5 +1,7 @@
 # this class performs the final evaluation of both our models and the pretrained baseline models 
 
+import sys
+sys.path.append("..")
 import torch.nn.functional as F
 from frechet_audio_distance import FrechetAudioDistance
 from tqdm import tqdm 
@@ -8,9 +10,10 @@ import soundfile as sf
 import os
 import global_objects
 import torch
+from memory_profiler import profile
 
 class EvaluationClass:
-    eval_set_size = 2
+    eval_set_size = 1000  # this is not the full eval set BUT using the full eval set takes an incredible amount of time (so I am doing this now)
 
     # pretrained indicates whether we are evaluating a pretrained baseline-model or a model that we trained ourselves
     def __init__(self, model, final_eval_dataloader, pretrained=False, name=None):
@@ -20,6 +23,13 @@ class EvaluationClass:
         self.name = name
 
     def eval(self, train_class):
+        curr_path = "/itet-stor/elucas/net_scratch/generative_inversion/train_classes/"
+        if os.path.exists(curr_path + "/frechet_y"):
+            os.system("rm -rf " + curr_path + "/frechet_y")
+            os.system("rm -rf " + curr_path + "/frechet_y_hat")
+        os.mkdir(curr_path + "/frechet_y")
+        os.mkdir(curr_path + "/frechet_y_hat")
+
         # compute final eval metrics
         metrics = dict() 
         frechet = FrechetAudioDistance(model_name="vggish", sample_rate=16000, use_pca=False, use_activation=False, verbose=False)
@@ -30,8 +40,6 @@ class EvaluationClass:
         sum_cos_sim_flattened = 0
         sum_waveform_dist_baseline = 0
         sum_waveform_dist = 0
-        frechet_y = []
-        frechet_y_hat = []
         counter = 0
         with torch.no_grad():  # this prevents the memory from overflowing in the loop
             for i, batch in tqdm(enumerate(self.final_eval_dataloader), total=self.eval_set_size):
@@ -43,8 +51,14 @@ class EvaluationClass:
                 ########  FORWARD PASS  ########
                 y_hat = None
                 loss = None
+                y_hat_spec = None
                 if not self.pretrained:  # the non pretrained models have a method called prepare_call_loss
                     x, y, y_hat, loss = train_class.prepare_call_loss(batch, diffusion_generate=True)  # we are dealine with one of our models
+                    # eval output of trained models in same space as the baselines operate in. 
+                    # batch size assumed to be 1 so we can take [0] without discarding any data. 
+                    x = torch.tensor(train_class.from_learning_space(x[0].detach().cpu().numpy())).unsqueeze(0).to("cuda")
+                    y = torch.tensor(train_class.from_learning_space(y[0].detach().cpu().numpy())).unsqueeze(0).to("cuda")
+                    y_hat = torch.tensor(train_class.from_learning_space(y_hat[0].detach().cpu().numpy())).unsqueeze(0).to("cuda")
                 else:  # the pretrained models only have the forward method
                     if not self.name == "simple_baseline":  # all the baselines that are not simple_baseline return a waveform
                         # audioldm2 needs special treatment
@@ -64,20 +78,24 @@ class EvaluationClass:
                 ####  MSE  ####
                 reduced_loss = torch.mean(loss, dim=0)  # need to reduce over batch dim
                 sum_mse += reduced_loss
+                del reduced_loss
                 ####  L1  ####
                 l1 = F.l1_loss(y, y_hat)
                 sum_l1 = torch.mean(l1, dim=0)  # need to reduce over batch dim
+                del l1
                 ####  COS SIM  ####
                 sim = F.cosine_similarity(y, y_hat, dim=1)
                 normd_sim = self.normalize_cos_sim(sim)
                 reduced_sim = torch.mean(normd_sim, dim=0)  # need to reduce over batch dim
                 reduced_sim = torch.mean(reduced_sim, dim=0)  # need to reduce over rows
                 sum_cos_sim_row += reduced_sim
+                del sim, normd_sim, reduced_sim
                 sim = F.cosine_similarity(y, y_hat, dim=2)
                 normd_sim = self.normalize_cos_sim(sim)
                 reduced_sim = torch.mean(normd_sim, dim=0)  # need to reduce over batch dim
                 reduced_sim = torch.mean(reduced_sim, dim=0)  # need to reduce over cols
                 sum_cos_sim_col += reduced_sim
+                del sim, normd_sim, reduced_sim
                 # flattened
                 y_flat = y.reshape(y.shape[0], -1) 
                 y_hat_flat = y_hat.reshape(y_hat.shape[0], -1)
@@ -85,10 +103,11 @@ class EvaluationClass:
                 normd_sim = self.normalize_cos_sim(sim)
                 reduced_sim = torch.mean(normd_sim, dim=0)  # need to reduce over batch dim
                 sum_cos_sim_flattened += reduced_sim
+                del sim, normd_sim, reduced_sim, y_flat, y_hat_flat
                 ####  FRECHET  ####
                 for i in range(x.shape[0]):
-                    frechet_y.append(y[i].detach().cpu().numpy())
-                    frechet_y_hat.append(y_hat[i].detach().cpu().numpy())
+                    self.prepare_for_frechet(y[i].detach().cpu().numpy(), curr_path + "/frechet_y", i)
+                    self.prepare_for_frechet(y_hat[i].detach().cpu().numpy(), curr_path + "/frechet_y_hat", i)
                 ####  WAVEFORM DIST  ####
                 # baseline
                 for i in range(x.shape[0]):
@@ -96,23 +115,22 @@ class EvaluationClass:
                     if not self.pretrained:
                         spec = spec.to("cuda")
                     sum_waveform_dist_baseline += F.mse_loss(spec, y[i])
+                    del spec
                 # normal waveform dist
                 for i in range(x.shape[0]):
                     spec = torch.tensor(global_objects.stft_system.spectrogram(global_objects.stft_system.invert_spectrogram(y_hat[i].detach().cpu().numpy())))
                     if not self.pretrained:
                         spec = spec.to("cuda")
                     sum_waveform_dist += F.mse_loss(spec, y[i])
+                    del spec
+                # delete everything that is not needed anymore
+                del x
+                del y
+                del y_hat
+                del loss
+                del y_hat_spec
+                torch.cuda.empty_cache()
         ####  FRECHET  ####
-        # preprocess data
-        curr_path = "/itet-stor/elucas/net_scratch/generative_inversion/train_classes/"
-        if os.path.exists(curr_path + "/frechet_y"):
-            os.system("rm -rf " + curr_path + "/frechet_y")
-            os.system("rm -rf " + curr_path + "/frechet_y_hat")
-        os.mkdir(curr_path + "/frechet_y")
-        os.mkdir(curr_path + "/frechet_y_hat")
-        for i in range(len(frechet_y)):
-            self.prepare_for_frechet(frechet_y[i], curr_path + "/frechet_y", i)
-            self.prepare_for_frechet(frechet_y_hat[i], curr_path + "/frechet_y_hat", i)
         frechet_score = frechet.score(curr_path + "/frechet_y", curr_path + "/frechet_y_hat", dtype="float32")
         
         metrics["mse"] = (sum_mse / counter).item()
@@ -124,11 +142,8 @@ class EvaluationClass:
         metrics["waveform_dist_baseline"] = (sum_waveform_dist_baseline / counter).item()
         metrics["waveform_dist"] = (sum_waveform_dist / counter).item()
 
-        # write metrics to txt file
-        if self.pretrained == False:
-            path = train_class.checkpoints_path + "/metrics.txt"
-        else:
-            path = "/itet-stor/elucas/net_scratch/generative_inversion/" + "metrics_" + self.name + ".txt"
+        # save metrics
+        path = "/itet-stor/elucas/net_scratch/generative_inversion/evaluation/" + "metrics_" + self.name + ".txt"
         with open(path, "w") as f:
             for key, value in metrics.items():
                 f.write(str(key) + ": " + str(value) + "\n")

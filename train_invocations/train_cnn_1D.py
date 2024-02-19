@@ -10,8 +10,8 @@ from pytorch_lightning.loggers import WandbLogger
 # training
 batch_size = 32
 lr = 0.0001
-max_epochs = 1
-eval_freq = 2
+max_epochs = 1000  # does not have an effect because I have a IterableDataset
+eval_freq = 500
 # model
 kernel_size = 5
 pred_diff = True  # switch betwwen predicting the full spec or the diff to the target spec

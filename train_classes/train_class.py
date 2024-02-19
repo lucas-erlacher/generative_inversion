@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import global_objects
 import time
 import os
-from evaluation_class import EvaluationClass
+from evaluation.evaluation_class import EvaluationClass
 
 log_memory_usage = False  # for debugging
 
@@ -32,7 +32,7 @@ class TrainClass(pl.LightningModule):
         self.quick_eval_dataloader = loader.get_quick_eval_loader(batch_size)
         # set up checkpoint dirs 
         train_start = time.strftime("%B%d-%H%M", time.localtime())
-        self.checkpoints_path = "../checkpoints/" + self.model.name + "/" + train_start
+        self.checkpoints_path = "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/" + self.model.name + "/" + train_start
         os.makedirs(self.checkpoints_path)
         self.eval_class = EvaluationClass(self.model, self.final_eval_dataloader)
 
@@ -193,8 +193,8 @@ class TrainClass(pl.LightningModule):
         y = spec_to_preprocessed_spec(y)
         return x, y
 
-    def from_learning_space(self, entity):
-        entity = spec_to_preprocessed_spec_inverse(entity, numpy=True)
+    def from_learning_space(self, entity, numpy=True):
+        entity = spec_to_preprocessed_spec_inverse(entity, numpy=numpy)
         return entity 
     
     def save_model(self, final_model, model, loss=None):

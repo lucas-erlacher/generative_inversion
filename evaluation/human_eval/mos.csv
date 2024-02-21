@@ -1,0 +1,11 @@
+model, sample 3, sample 5, sample, 8, sample, 11, sample 14
+
+pseudo, 2, 3, 2, 3, 2
+hifi, 1, 2, 1, 1, 1 
+vgan, 2, 4, 3, 3, 4 
+cnn1d, 1, 2, 2, 2, 3
+cnn2d, 3, 4, 4, 4, 4
+unet, 2, 2, 2, 3, 3
+diff_10, 2, 2, 2, 3, 3
+diff_100, 2, 2, 3, 3, 3
+diff_1000, 2, 2, 3, 3, 3

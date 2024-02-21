@@ -11,9 +11,17 @@ import os
 import global_objects
 import torch
 from memory_profiler import profile
+from utils_lucas import spec_to_wav
+import numpy as np
+import wandb
+from PIL import Image
+from scipy.io.wavfile import write
+
+save = False
 
 class EvaluationClass:
     eval_set_size = 1000  # this is not the full eval set BUT using the full eval set takes an incredible amount of time (so I am doing this now)
+    human_eval_path = "/itet-stor/elucas/net_scratch/generative_inversion/evaluation/human_eval/"
 
     # pretrained indicates whether we are evaluating a pretrained baseline-model or a model that we trained ourselves
     def __init__(self, model, final_eval_dataloader, pretrained=False, name=None):
@@ -61,10 +69,6 @@ class EvaluationClass:
                     y_hat = torch.tensor(train_class.from_learning_space(y_hat[0].detach().cpu().numpy())).unsqueeze(0).to("cuda")
                 else:  # the pretrained models only have the forward method
                     if not self.name == "simple_baseline":  # all the baselines that are not simple_baseline return a waveform
-                        # audioldm2 needs special treatment
-                        if self.name == "audioldm2":
-                            x = x[:, :, ::4]  # audioldm2 internally upsamples the time dimension of the spec by a factor of 4
-                            x.permute(0, 2, 1)  # the vocoder has time dim first and then mel dim
                         y_hat = self.model.forward(x)  # we are dealing with a pretrained baseline model
                         y_hat_spec = torch.zeros(y.shape)
                         for i in range(y_hat.shape[0]):
@@ -73,6 +77,10 @@ class EvaluationClass:
                     else:  # simple_baseline returns a spec
                         y_hat = self.model.forward(x)
                     loss = F.mse_loss(y_hat, y)
+
+                ########  HUMAN EVAL  ########
+                print(counter)
+                spec_to_wav(y_hat[0].detach().cpu().numpy(), self.human_eval_path + self.name + "__" + str(counter) + ".wav")
 
                 ########  COMPUTE METRICS  ########
                 ####  MSE  ####
@@ -142,11 +150,12 @@ class EvaluationClass:
         metrics["waveform_dist_baseline"] = (sum_waveform_dist_baseline / counter).item()
         metrics["waveform_dist"] = (sum_waveform_dist / counter).item()
 
-        # save metrics
-        path = "/itet-stor/elucas/net_scratch/generative_inversion/evaluation/" + "metrics_" + self.name + ".txt"
-        with open(path, "w") as f:
-            for key, value in metrics.items():
-                f.write(str(key) + ": " + str(value) + "\n")
+        if save:
+            # save metrics
+            path = "/itet-stor/elucas/net_scratch/generative_inversion/evaluation/" + "metrics_" + self.name + ".txt"
+            with open(path, "w") as f:
+                for key, value in metrics.items():
+                    f.write(str(key) + ": " + str(value) + "\n")
 
     # little hleper function that transforms the ragne of cos sim from [-1, 1] to [0, 1]
     def normalize_cos_sim(self, cos_sim):

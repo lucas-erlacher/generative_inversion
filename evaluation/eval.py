@@ -23,24 +23,28 @@ from train_classes.train_class import TrainClass
 import yaml
 import time
 import global_objects
+from pretrained_loader import get_eval_loader
 
-if __name__ == "__main__":
+def load():
     models = []
-
+    '''
     # load simple_baseline
     model = SimpleModel()
     models.append((model, "simple_baseline", True))
+    '''
     
     # load HifiGAN
     checkpoint_path = "/itet-stor/elucas/net_scratch/VCTK_V1"
     model = load_hifigan(checkpoint_path)
     models.append((model, "hifigan", True))
 
+
     # load bigVGAN
     checkpoint_path = "/itet-stor/elucas/net_scratch/bigvgan_22khz_80band"
     model = load_bigvgan(checkpoint_path)
     models.append((model, "bigvgan", True))
 
+    '''
     # load cnn_1D
     path = "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/cnn_1D/February08-1922/0_102500.pt"
     model = Cnn1D(params_cnn_1D.kernel_size, params_cnn_1D.pred_diff, params_cnn_1D.in_channels)
@@ -67,11 +71,12 @@ if __name__ == "__main__":
     model = model.to("cuda")
     models.append((model, "unet_1D", False))
 
+
     # diff models
     checkpoints_paths = [
-        # "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February11-2219/0_102500.pt",  # diff_run_1
+        "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February11-2219/0_102500.pt",  # diff_run_1
         # "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February12-2217/0_89500.pt",  # diff_run_2
-        "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February13-2315/0_147000.pt"  # final diff_run
+        # "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February13-2315/0_147000.pt"  # final diff_run
     ]
 
     for i, checkpoint_path in enumerate(checkpoints_paths):
@@ -90,7 +95,14 @@ if __name__ == "__main__":
         model = model.to("cuda")
         models.append((model, name, False))
 
+    '''
+
     print("loaded models")
+
+    return models
+
+if __name__ == "__main__":
+    models = load()
 
     for model in models:
         print()
@@ -98,8 +110,11 @@ if __name__ == "__main__":
         print("evaluating model", model[1])
         print("#" * 20)
         print()
-        loader = Loader()
-        final_eval_dataloader = loader.get_test_loader(batch_size=1) # batch size can be anything here since it does not change the result of the evaluation
+        if model[1] == "hifigan" or model[1] == "bigvgan":
+            final_eval_dataloader = get_eval_loader(1)
+        else:
+            loader = Loader()
+            final_eval_dataloader = loader.get_test_loader(batch_size=1) # batch size can be anything here since it does not change the result of the evaluation
         eval_class = EvaluationClass(model=model[0], final_eval_dataloader=final_eval_dataloader, pretrained=model[2], name=model[1])
         if model[2] == False:
             tc = TrainClass(model[0], batch_size=1, eval_freq=1)  # batch_size assumed to be 1 in evaluation_class

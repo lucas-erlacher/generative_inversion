@@ -27,11 +27,11 @@ from pretrained_loader import get_eval_loader
 
 def load():
     models = []
+
     '''
     # load simple_baseline
     model = SimpleModel()
     models.append((model, "simple_baseline", True))
-    '''
     
     # load HifiGAN
     checkpoint_path = "/itet-stor/elucas/net_scratch/VCTK_V1"
@@ -44,7 +44,6 @@ def load():
     model = load_bigvgan(checkpoint_path)
     models.append((model, "bigvgan", True))
 
-    '''
     # load cnn_1D
     path = "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/cnn_1D/February08-1922/0_102500.pt"
     model = Cnn1D(params_cnn_1D.kernel_size, params_cnn_1D.pred_diff, params_cnn_1D.in_channels)
@@ -71,12 +70,13 @@ def load():
     model = model.to("cuda")
     models.append((model, "unet_1D", False))
 
+    '''
 
     # diff models
     checkpoints_paths = [
-        "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February11-2219/0_102500.pt",  # diff_run_1
+        # "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February11-2219/0_102500.pt",  # diff_run_1
         # "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February12-2217/0_89500.pt",  # diff_run_2
-        # "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February13-2315/0_147000.pt"  # final diff_run
+        "/itet-stor/elucas/net_scratch/generative_inversion/checkpoints/diffusion_model/February13-2315/0_147000.pt"  # final diff_run
     ]
 
     for i, checkpoint_path in enumerate(checkpoints_paths):
@@ -94,8 +94,6 @@ def load():
         model.load_state_dict(state_dict)
         model = model.to("cuda")
         models.append((model, name, False))
-
-    '''
 
     print("loaded models")
 

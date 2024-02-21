@@ -45,7 +45,7 @@ def data_generator(valid_dirs, spec_len):
                         continue
                     pieces = [audio[i:i + spec_len] for i in range(0, len(audio), spec_len)]
                     # iterate over the pieces
-                    for piece in pieces:
+                    for i, piece in enumerate(pieces):
                         if len(piece) < spec_len:
                             # skip last piece of split if it is shorter than x_len
                             continue

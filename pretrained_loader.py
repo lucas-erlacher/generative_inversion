@@ -126,6 +126,7 @@ class MelDataset(torch.utils.data.Dataset):
         # cut out spec_len at curr_pos
         try:
             audio = audio[self.file_index*65536:(self.file_index+1)*65536]
+            self.file_index += 1
         except (IndexError):
             # work on next file now
             self.file_index = 0

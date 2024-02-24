@@ -1,0 +1,61 @@
+# go over all samples and score them
+
+index, score
+vgan, 3
+diff_10, 2
+diff_100, 2
+diff_1000, 3
+cnn1d, 3
+diff_1000, 2
+diff_1000, 3
+diff_100, 2
+diff_10, 3
+cnn2d, 4
+pseudo, 3
+hifi, 1
+cnn2d, 4
+pseudo, 3
+unet, 1
+cnn2d, 4
+cnn2d, 4
+unet, 2
+cnn1d, 3
+cnn1d, 1
+unet, 2
+cnn1d, 2
+hifi, 1
+cnn1d, 1
+cnn2d, 4
+diff_100, 2
+diff_10, 2
+diff_10, 2
+vgan, 3
+hifi, 1
+hifi, 1
+diff_10, 3
+unet, 2
+vgan, 2
+pseudo, 2
+vgan, 4
+hifi, 1
+unet, 3
+diff_1000, 2
+diff_1000, 3
+vgan, 3
+diff_100, 3
+pseudo, 2
+diff_100, 2
+pseudo, 2
+
+# now structure the collected data by model name
+
+model, sample 3, sample 5, sample, 8, sample, 11, sample 14
+pseudo, 3, 3, 2, 2, 2
+hifi, 1, 1, 1, 1, 1 
+vgan, 3, 3, 2, 4, 3
+cnn1d, 3, 3, 1, 2, 1
+cnn2d, 4, 4, 4, 4, 4
+unet, 1, 2, 2, 2, 3
+diff_10, 2, 3, 2, 2, 3
+diff_100, 2, 3, 1, 2, 2
+diff_1000, 3, 2, 3, 2, 3

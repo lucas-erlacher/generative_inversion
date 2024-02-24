@@ -20,7 +20,7 @@ from scipy.io.wavfile import write
 save = False
 
 class EvaluationClass:
-    eval_set_size = 15  # this is not the full eval set BUT using the full eval set takes an incredible amount of time (so I am doing this now)
+    eval_set_size = 1000  # this is not the full eval set BUT using the full eval set takes an incredible amount of time (so I am doing this now)
     human_eval_path = "/itet-stor/elucas/net_scratch/generative_inversion/evaluation/human_eval/"
 
     # pretrained indicates whether we are evaluating a pretrained baseline-model or a model that we trained ourselves
